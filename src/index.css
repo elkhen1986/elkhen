@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Elkhen Design System - Deep Navy Glassmorphism */
+@layer base {
+  :root {
+    /* Deep navy background palette */
+    --background: 222 60% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 50% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 55% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Glowing blue primary */
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 8%;
+    --primary-glow: 200 100% 65%;
+
+    --secondary: 222 40% 14%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 222 30% 16%;
+    --muted-foreground: 215 20% 70%;
+
+    /* Gold accent for points */
+    --accent: 45 93% 58%;
+    --accent-foreground: 222 47% 8%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 222 47% 8%;
+
+    --border: 217 50% 22%;
+    --input: 217 40% 18%;
+    --ring: 217 91% 60%;
+
+    --radius: 1rem;
+
+    /* Gradients */
+    --gradient-bg: radial-gradient(ellipse at top, hsl(222 60% 12%) 0%, hsl(222 70% 4%) 100%);
+    --gradient-glass: linear-gradient(135deg, hsl(217 91% 60% / 0.1), hsl(222 60% 30% / 0.05));
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(200 100% 65%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 95% 55%));
+
+    /* Glows & Shadows */
+    --glow-primary: 0 0 40px hsl(217 91% 60% / 0.5), 0 0 80px hsl(217 91% 60% / 0.25);
+    --glow-gold: 0 0 30px hsl(45 93% 58% / 0.5);
+    --shadow-glass: 0 8px 32px hsl(222 80% 2% / 0.6), inset 0 1px 0 hsl(0 0% 100% / 0.08);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply text-foreground;
+    font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+    background: var(--gradient-bg);
+    background-attachment: fixed;
+    min-height: 100vh;
+    direction: rtl;
+  }
+
+  /* Animated background blobs */
+  body::before,
+  body::after {
+    content: '';
+    position: fixed;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::before {
+    background: hsl(var(--primary));
+    top: -200px;
+    right: -200px;
+    animation: float-blob 20s ease-in-out infinite;
+  }
+  body::after {
+    background: hsl(var(--primary-glow));
+    bottom: -200px;
+    left: -200px;
+    animation: float-blob 25s ease-in-out infinite reverse;
+  }
+}
+
+@layer components {
+  .glass {
+    background: var(--gradient-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsl(217 50% 50% / 0.18);
+    box-shadow: var(--shadow-glass);
+  }
+
+  .glass-strong {
+    background: hsl(222 50% 10% / 0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(217 60% 55% / 0.25);
+    box-shadow: var(--shadow-glass);
+  }
+
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+
+  .glow-gold {
+    box-shadow: var(--glow-gold);
+  }
+
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .hover-lift:hover:not(:disabled) {
+    transform: translateY(-4px);
+    border-color: hsl(217 91% 60% / 0.6);
+    box-shadow: 0 12px 40px hsl(217 91% 60% / 0.3);
+  }
+}
+
+@keyframes float-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -40px) scale(1.1); }
+  66% { transform: translate(-30px, 30px) scale(0.95); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px hsl(217 91% 60% / 0.4); }
+  50% { box-shadow: 0 0 40px hsl(217 91% 60% / 0.7), 0 0 60px hsl(200 100% 65% / 0.4); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-pulse-glow { animation: pulse-glow 2.5s ease-in-out infinite; }
+.animate-fade-in { animation: fade-in 0.4s ease-out; }
+.animate-scale-in { animation: scale-in 0.3s ease-out; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.4);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.7); }
