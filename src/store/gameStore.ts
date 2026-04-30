@@ -9,7 +9,7 @@ export type AidType = "swap" | "call" | "twoAnswers";
 export interface TeamState {
   name: string;
   score: number;
-  aids: Record<AidType, boolean>; // true = available
+  aids: Record<AidType, boolean>;
 }
 
 export interface ActiveQuestion {
@@ -25,9 +25,13 @@ interface GameState {
   selectedCategories: CategoryId[];
   currentTurn: 1 | 2;
   timerDuration: 30 | 60 | 90;
-  usedQuestionIds: Record<string, true>; // categoryId-points -> set
-  usedSlots: Record<string, true>; // categoryId-points-side -> consumed
+  usedQuestionIds: Record<string, true>;
+  usedSlots: Record<string, true>;
   active: ActiveQuestion | null;
+
+  // 👇 عدّلتهم
+  theme: 'default' | 'pharaonic' | 'ramadan' | 'eid' | 'worldcup' | 'neon' | 'winter';
+  setTheme: (t: 'default' | 'pharaonic' | 'ramadan' | 'eid' | 'worldcup' | 'neon' | 'winter') => void;
 
   setTeamName: (n: 1 | 2, name: string) => void;
   toggleCategory: (id: CategoryId) => void;
@@ -62,13 +66,16 @@ export const useGameStore = create<GameState>()(
       usedSlots: {},
       active: null,
 
+      theme: 'default',
+      setTheme: (t) => set({ theme: t }),
+
       setTeamName: (n, name) =>
-        set((s) => ({ [n === 1 ? "team1" : "team2"]: { ...(n === 1 ? s.team1 : s.team2), name } } as Partial<GameState>)),
+        set((s) => ({ [n === 1? "team1" : "team2"]: {...(n === 1? s.team1 : s.team2), name } } as Partial<GameState>)),
 
       toggleCategory: (id) =>
         set((s) => {
           const exists = s.selectedCategories.includes(id);
-          if (exists) return { selectedCategories: s.selectedCategories.filter((c) => c !== id) };
+          if (exists) return { selectedCategories: s.selectedCategories.filter((c) => c!== id) };
           if (s.selectedCategories.length >= 6) return {};
           return { selectedCategories: [...s.selectedCategories, id] };
         }),
@@ -77,8 +84,8 @@ export const useGameStore = create<GameState>()(
 
       startGame: () =>
         set({
-          team1: { ...get().team1, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
-          team2: { ...get().team2, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
+          team1: {...get().team1, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
+          team2: {...get().team2, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
           currentTurn: 1,
           usedQuestionIds: {},
           usedSlots: {},
@@ -101,35 +108,35 @@ export const useGameStore = create<GameState>()(
         if (!active) return;
         const usedIds = new Set([...Object.keys(usedQuestionIds), active.questionId]);
         const q = pickRandomQuestion(active.categoryId, active.points, usedIds);
-        if (q) set({ active: { ...active, questionId: q.id } });
+        if (q) set({ active: {...active, questionId: q.id } });
       },
 
       awardPoints: (winner) => {
         const { active, currentTurn } = get();
         if (!active) return;
         const updates: Partial<GameState> = {
-          usedQuestionIds: { ...get().usedQuestionIds, [active.questionId]: true },
-          usedSlots: { ...get().usedSlots, [slotKey(active.categoryId, active.points, active.side)]: true },
+          usedQuestionIds: {...get().usedQuestionIds, [active.questionId]: true },
+          usedSlots: {...get().usedSlots, [slotKey(active.categoryId, active.points, active.side)]: true },
           active: null,
-          currentTurn: currentTurn === 1 ? 2 : 1,
+          currentTurn: currentTurn === 1? 2 : 1,
         };
-        if (winner === 1) updates.team1 = { ...get().team1, score: get().team1.score + active.points };
-        else if (winner === 2) updates.team2 = { ...get().team2, score: get().team2.score + active.points };
+        if (winner === 1) updates.team1 = {...get().team1, score: get().team1.score + active.points };
+        else if (winner === 2) updates.team2 = {...get().team2, score: get().team2.score + active.points };
         set(updates as GameState);
       },
 
       useAid: (team, aid) =>
         set((s) => {
-          const t = team === 1 ? s.team1 : s.team2;
+          const t = team === 1? s.team1 : s.team2;
           if (!t.aids[aid]) return {};
-          const updated = { ...t, aids: { ...t.aids, [aid]: false } };
-          return { [team === 1 ? "team1" : "team2"]: updated } as Partial<GameState>;
+          const updated = {...t, aids: {...t.aids, [aid]: false } };
+          return { [team === 1? "team1" : "team2"]: updated } as Partial<GameState>;
         }),
 
       adjustScore: (team, delta) =>
         set((s) => {
-          const t = team === 1 ? s.team1 : s.team2;
-          return { [team === 1 ? "team1" : "team2"]: { ...t, score: Math.max(0, t.score + delta) } } as Partial<GameState>;
+          const t = team === 1? s.team1 : s.team2;
+          return { [team === 1? "team1" : "team2"]: {...t, score: Math.max(0, t.score + delta) } } as Partial<GameState>;
         }),
 
       endGame: () =>
@@ -138,8 +145,8 @@ export const useGameStore = create<GameState>()(
           usedSlots: {},
           active: null,
           currentTurn: 1,
-          team1: { ...get().team1, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
-          team2: { ...get().team2, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
+          team1: {...get().team1, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
+          team2: {...get().team2, score: 0, aids: { swap: true, call: true, twoAnswers: true } },
         }),
 
       fullReset: () =>
@@ -152,6 +159,7 @@ export const useGameStore = create<GameState>()(
           usedQuestionIds: {},
           usedSlots: {},
           active: null,
+          theme: 'default',
         }),
     }),
     { name: "elkhen-game-state" },

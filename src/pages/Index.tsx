@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Users2, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeSelector } from "@/components/ThemeSelector"; // 👈 ضيفناه
 
 const Index = () => {
   const navigate = useNavigate();
@@ -27,6 +28,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen relative z-10 px-3 sm:px-6 py-6 sm:py-10">
+      {/* 👇 الثيم هنا */}
+      <div className="absolute top-4 left-4 z-50">
+        <ThemeSelector />
+      </div>
+
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Hero */}
         <header className="text-center space-y-3 animate-fade-in">

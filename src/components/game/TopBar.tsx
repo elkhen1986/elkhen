@@ -7,6 +7,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ThemeSelector } from "../ThemeSelector"; // 👈
 
 interface Props {
   showBackToBoard?: boolean;
@@ -29,6 +30,11 @@ export function TopBar({ showBackToBoard }: Props) {
       </Link>
 
       <div className="flex items-center gap-2 mr-auto sm:mr-0 sm:order-3">
+        {/* 👇 القائمة هنا */}
+        <div className="hidden sm:block">
+          <ThemeSelector />
+        </div>
+        
         {showBackToBoard && (
           <Button variant="ghost" size="sm" onClick={() => navigate("/board")} className="gap-1.5">
             <LayoutGrid className="w-4 h-4" />
@@ -68,6 +74,11 @@ export function TopBar({ showBackToBoard }: Props) {
         <span className="px-3 py-1 rounded-full bg-gradient-primary text-primary-foreground font-bold text-sm sm:text-base animate-pulse-glow">
           {team.name || `الفريق ${currentTurn}`}
         </span>
+      </div>
+
+      {/* للموبايل: تحت */}
+      <div className="w-full sm:hidden flex justify-center pt-1">
+        <ThemeSelector />
       </div>
     </header>
   );
