@@ -5,13 +5,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type CategoryId =
-  | "quran" | "seera" | "sahaba"
-  | "general"
-  | "countries" | "maps" | "flags" | "currencies" | "leaders"
-  | "egypt_history" | "governorates"
-  | "movies" | "series" | "songs"
-  | "guess_eye" | "riddles" | "observation" | "math_riddles" | "differences";
+export type CategoryId = string;
 
 export interface Category {
   id: CategoryId;
@@ -30,6 +24,7 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     title: "فئات إسلامية",
     categories: [
       { id: "quran", name: "قرآن كريم", icon: BookOpen, color: "from-emerald-500 to-teal-600" },
+      { id: "islamics", name: "إسلاميات", icon: BookOpen, color: "from-emerald-500 to-teal-600" },
       { id: "seera", name: "السيرة النبوية", icon: Moon, color: "from-emerald-600 to-green-700" },
       { id: "sahaba", name: "صحابة الرسول", icon: Users, color: "from-teal-500 to-emerald-700" },
     ],
@@ -38,6 +33,10 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     title: "فئات عامة",
     categories: [
       { id: "general", name: "معلومات عامة", icon: Lightbulb, color: "from-blue-500 to-indigo-600" },
+      { id: "medical", name: "معلومات طبية", icon: Lightbulb, color: "from-blue-500 to-indigo-600" },
+      { id: "scince", name: "العلوم", icon: Lightbulb, color: "from-blue-500 to-indigo-600" },
+      { id: "earth", name: "الأرض والفضاء", icon: Lightbulb, color: "from-blue-500 to-indigo-600" },
+      { id: "gob", name: "ماهي مهنتي؟", icon: Lightbulb, color: "from-blue-500 to-indigo-600" },
     ],
   },
   {
@@ -48,6 +47,7 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
       { id: "flags", name: "أعلام الدول", icon: Flag, color: "from-rose-500 to-red-600" },
       { id: "currencies", name: "عملات", icon: Coins, color: "from-amber-500 to-yellow-600" },
       { id: "leaders", name: "زعماء ورؤساء", icon: Crown, color: "from-purple-500 to-violet-600" },
+      { id: "m3alem", name: "معالم", icon: Globe, color: "from-sky-500 to-blue-600" },
     ],
   },
   {
@@ -73,6 +73,44 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
       { id: "observation", name: "قوة الملاحظة", icon: Search, color: "from-cyan-500 to-teal-600" },
       { id: "math_riddles", name: "ألغاز رياضية", icon: Calculator, color: "from-blue-600 to-indigo-700" },
       { id: "differences", name: "أوجد الاختلافات", icon: Diff, color: "from-teal-500 to-cyan-600" },
+    ],
+  },
+  {
+    title: "إنمي",
+    categories: [
+      { id: "demon slayer", name: "قاتل الشياطين", icon: Eye, color: "from-indigo-500 to-blue-600" },
+      { id: "brainrot", name: "براين روت", icon: Brain, color: "from-violet-500 to-purple-600" },
+      { id: "solo", name: "سولو ليفلينج", icon: Search, color: "from-cyan-500 to-teal-600" },
+      { id: "roblox", name: "روبلوكس", icon: Search, color: "from-cyan-500 to-teal-600" },
+      { id: "brawl star", name: "براول ستار", icon: Search, color: "from-cyan-500 to-teal-600" },
+    ],
+  },
+  {
+    title: "ماركات",
+    categories: [
+      { id: "brands", name: "ماركات عالمية", icon: Eye, color: "from-indigo-500 to-blue-600" },
+      { id: "cars", name: "سيارات", icon: Brain, color: "from-violet-500 to-purple-600" },
+      { id: "women", name: "منتجات نسائية", icon: Search, color: "from-cyan-500 to-teal-600" },
+      { id: "cosmetics", name: "مستحضرات تجميل", icon: Search, color: "from-cyan-500 to-teal-600" },
+    ],
+  },
+  {
+    title: "كرة قدم",
+    categories: [
+      { id: "International football", name: "كرة قدم عالمية", icon: Eye, color: "from-indigo-500 to-blue-600" },
+      { id: "world cup", name: "كأس العالم", icon: Brain, color: "from-violet-500 to-purple-600" },
+      { id: "english premier league", name: "الدوري الإنجليزي الممتاز", icon: Brain, color: "from-violet-500 to-purple-600" },
+      { id: "spanish premier league", name: "الدوري الأسباني الممتاز", icon: Brain, color: "from-violet-500 to-purple-600" },
+      { id: "Egyptian Premier League", name: "الدوري المصري الممتاز", icon: Search, color: "from-cyan-500 to-teal-600" },
+      { id: "UEFA champions league", name: "دوري أبطال أوروبا", icon: Search, color: "from-cyan-500 to-teal-600" },
+    ],
+  },
+  {
+    title: "تكنولوجيا",
+    categories: [
+      { id: "computer", name: "الحواسيب", icon: Eye, color: "from-indigo-500 to-blue-600" },
+      { id: "ai", name: "AI", icon: Brain, color: "from-violet-500 to-purple-600" },
+      { id: "apps", name: "برامج وتطبيقات", icon: Search, color: "from-cyan-500 to-teal-600" },
     ],
   },
 ];
