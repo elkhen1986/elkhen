@@ -1,13 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { CATEGORY_GROUPS } from "@/data/categories";
 import { CategoryGroupSection } from "@/components/game/CategoryGroupSection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Users2, Timer, Maximize, Minimize } from "lucide-react";
+import { Sparkles, Users2, Timer, Maximize, Minimize, LogOut, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/ThemeSelector";
+import { auth, storage } from "@/lib/firebase";
+import { signOut, onAuthStateChanged, updateProfile, User } from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -20,11 +23,18 @@ const Index = () => {
   const startGame = useGameStore((s) => s.startGame);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, setUser);
+    return () => unsub();
   }, []);
 
   const toggleFullscreen = async () => {
@@ -39,6 +49,21 @@ const Index = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/login", { replace: true });
+  };
+
+  const handleAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file ||!auth.currentUser) return;
+    const storageRef = ref(storage, `avatars/${auth.currentUser.uid}.jpg`);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    await updateProfile(auth.currentUser, { photoURL: url });
+    setUser({...auth.currentUser });
+  };
+
   const canStart = team1.name.trim().length > 0 && team2.name.trim().length > 0 && selectedCategories.length === 6;
 
   const handleStart = () => {
@@ -47,21 +72,51 @@ const Index = () => {
     navigate("/board");
   };
 
+  const username = user?.email?.split("@")[0] || "";
+  const photoURL = user?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${username}`;
+
   return (
     <div className="min-h-screen relative z-10 px-3 sm:px-6 py-6 sm:py-10">
       <div className="absolute top-4 left-4 z-50">
         <ThemeSelector />
       </div>
 
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+        {/* الاسم والصورة */}
+        {user && (
+          <div className="flex items-center gap-2 glass rounded-full pl-3 pr-1 py-1">
+            <span className="text-sm font-bold hidden sm:block">{username}</span>
+            <button onClick={() => fileRef.current?.click()} className="relative group">
+              <img src={photoURL} className="w-9 h-9 rounded-full object-cover border-2 border-primary/40 group-hover:border-primary transition" alt="avatar" />
+              <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                <Camera className="w-4 h-4 text-white" />
+              </div>
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar} />
+          </div>
+        )}
+
+        {/* زرار الخروج */}
+        <Button
+          onClick={handleLogout}
+          variant="outline"
+          size="icon"
+          className="glass rounded-full w-10 h-10 hover:bg-red-500/20 hover:border-red-500/50 group"
+          aria-label="تسجيل خروج"
+          title="تسجيل خروج"
+        >
+          <LogOut className="w-5 h-5 text-muted-foreground group-hover:text-red-400 transition-colors" />
+        </Button>
+
+        {/* زرار الفول سكرين */}
         <Button
           onClick={toggleFullscreen}
           variant="outline"
           size="icon"
           className="glass rounded-full w-10 h-10"
-          aria-label={isFullscreen ? "الخروج من ملء الشاشة" : "ملء الشاشة"}
+          aria-label={isFullscreen? "الخروج من ملء الشاشة" : "ملء الشاشة"}
         >
-          {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          {isFullscreen? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
         </Button>
       </div>
 
@@ -118,7 +173,7 @@ const Index = () => {
                   className={cn(
                     "px-4 py-1.5 rounded-full font-bold text-sm transition",
                     timerDuration === d
-                     ? "bg-gradient-primary text-primary-foreground glow-primary"
+                    ? "bg-gradient-primary text-primary-foreground glow-primary"
                       : "glass text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -135,13 +190,13 @@ const Index = () => {
             <div className={cn(
               "px-4 py-1.5 rounded-full font-black text-sm transition",
               selectedCategories.length === 6
-               ? "bg-success/20 text-success ring-1 ring-success"
+              ? "bg-success/20 text-success ring-1 ring-success"
                 : "glass text-muted-foreground"
             )}>
               {selectedCategories.length} / 6
             </div>
-          </div> {/* ← دي كانت ناقصة */}
-          
+          </div>
+
           <div className="space-y-6">
             {CATEGORY_GROUPS.map((group) => (
               <CategoryGroupSection key={group.title} group={group} />
@@ -157,10 +212,10 @@ const Index = () => {
             className={cn(
               "w-full h-16 text-xl font-black rounded-2xl",
               "bg-gradient-primary text-primary-foreground",
-              canStart ? "glow-primary animate-pulse-glow hover:scale-[1.02]" : "opacity-50",
+              canStart? "glow-primary animate-pulse-glow hover:scale-[1.02]" : "opacity-50",
             )}
           >
-            {canStart ? "ابدأ اللعبة 🚀" : `أكمل البيانات لتفعيل الزر`}
+            {canStart? "ابدأ اللعبة 🚀" : `أكمل البيانات لتفعيل الزر`}
           </Button>
         </div>
       </div>
