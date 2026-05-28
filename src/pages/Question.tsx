@@ -4,8 +4,8 @@ import { useGameStore } from "@/store/gameStore";
 import { TopBar } from "@/components/game/TopBar";
 import { TeamScoreBar } from "@/components/game/TeamScoreBar";
 import { QuestionTimer } from "@/components/game/QuestionTimer";
-import { QUESTIONS } from "@/data/questions";
 import { getCategory } from "@/data/categories";
+import { loadCategory, Question as QType } from "@/lib/questionsLoader";
 
 const isVideo = (src?: string) =>!!src && /\.(mp4|webm|ogg)$/i.test(src);
 
@@ -24,6 +24,7 @@ export default function Question() {
   const [revealed, setRevealed] = useState(false);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
   const [knockoutWindow, setKnockoutWindow] = useState(true);
+  const [question, setQuestion] = useState<QType | null>(null);
 
   const questionVideoRef = useRef<HTMLVideoElement>(null);
   const answerVideoRef = useRef<HTMLVideoElement>(null);
@@ -45,6 +46,19 @@ export default function Question() {
   useEffect(() => {
     if (!active) navigate("/board", { replace: true });
   }, [active, navigate]);
+
+  useEffect(() => {
+    const fetchQ = async () => {
+      if (!active) return;
+      const all = await loadCategory(active.categoryId);
+      const q = all.find((qq) => qq.id === active.questionId)?? null;
+      setQuestion(q);
+    };
+    fetchQ();
+  }, [active]);
+
+  const qImages = useMemo(() => question?.image?? [], [question]);
+  const aImages = useMemo(() => question?.answerImage?? [], [question]);
 
   useEffect(() => {
     if (active?.points === 600) {
@@ -72,25 +86,22 @@ export default function Question() {
     }
   }, [active?.points]);
 
-  const question = useMemo(() => {
-    if (!active) return null;
-    return QUESTIONS[active.categoryId][active.points].find((q) => q.id === active.questionId)?? null;
-  }, [active]);
-
   useEffect(() => {
-    if (!revealed && isVideo(question?.image)) {
+    if (!revealed && isVideo(qImages[0])) {
       setTimeout(() => questionVideoRef.current?.play().catch(()=>{}), 50);
     }
-    if (revealed && isVideo(question?.answerImage)) {
+    if (revealed && isVideo(aImages[0])) {
       setTimeout(() => answerVideoRef.current?.play().catch(()=>{}), 50);
     }
-  }, [revealed, question]);
+  }, [revealed, qImages, aImages]);
 
   if (!active ||!question) return null;
   const cat = getCategory(active.categoryId);
 
   const isDual = (question as any)?.dual === true;
-  const correctSrc = isDual? ((question as any).correctSide === 'left'? question.image : question.answerImage) : null;
+  const correctSrc = isDual? ((question as any).correctSide === 'left'? qImages[0] : aImages[0]) : undefined;
+
+  const isColorQuestion = /ما\s*ألوان\s*الشعار|ما\s*ألوان|ما\s*لون/i.test(question.question);
 
   const handleWinner = (w: 1|2|0) => {
     finalAudio.current?.pause();
@@ -139,20 +150,20 @@ export default function Question() {
                 )}
 <h2
   className="text-xl md:text-2xl font-black leading-[1.6] text-white mb-6 max-w-3xl"
-  dangerouslySetInnerHTML={{ __html: question.text }}
+  dangerouslySetInnerHTML={{ __html: question.question }}
 />
 {!revealed && (
   <>
     {isDual? (
       <div className="flex gap-4 justify-center mb-4">
-        {[question.image, question.answerImage].map((src, idx) => src && (
+        {[qImages[0], aImages[0]].map((src, idx) => src && (
           <div key={idx} className="group/img relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
             {isVideo(src)? (
-              <video src={src} className={`relative w-auto max-w- max-h-48 object-contain rounded-2xl border border-white/15 ${(question as any).grayscale? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+              <video src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
             ) : (
-              <button onClick={() => setZoomImg(src!)}>
-                <img src={src} className={`relative w-auto max-w- max-h-48 object-contain rounded-2xl border border-white/15 ${(question as any).grayscale? 'grayscale contrast-125' : ''}`} />
+              <button onClick={() => setZoomImg(src?? null)}>
+                <img src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
               </button>
             )}
             <div className="absolute top-2 left-2 bg-black/70 text-white text-xs font-black px-2 py-0.5 rounded-lg">{idx===0?'A':'B'}</div>
@@ -160,24 +171,50 @@ export default function Question() {
         ))}
       </div>
     ) : (
-      question.image && (
-        <div className="group/img relative mb-4 inline-block">
-          <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
-          {isVideo(question.image)? (
-            <video ref={questionVideoRef} key={question.id} src={question.image} className={`relative w-auto max-w- max-h-56 object-contain rounded-2xl border border-white/15 ${(question as any).grayscale? 'grayscale' : ''}`} autoPlay loop playsInline controls />
-          ) : (
-            <button onClick={() => setZoomImg(question.image!)}>
-              <img src={question.image} className={`relative w-auto max-w- max-h-48 object-contain rounded-2xl border border-white/15 ${(question as any).grayscale? 'grayscale contrast-125' : ''}`} />
-            </button>
-          )}
-        </div>
-      )
+      <>
+        {qImages.length === 1 && (
+          <div className="group/img relative mb-4 inline-block">
+            <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
+            {isVideo(qImages[0])? (
+              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls />
+            ) : (
+              <button onClick={() => setZoomImg(qImages[0]?? null)}>
+                <img src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+              </button>
+            )}
+          </div>
+        )}
+        {qImages.length > 1 && (
+          <div className="flex flex-wrap justify-center gap-4 mb-4 w-full max-w-4xl mx-auto">
+            {qImages.map((src, i) => {
+              const label = String.fromCharCode(65 + i);
+              return (
+                <div key={i} className="group/img relative aspect-square w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/0 to-emerald-500/0 group-hover/img:from-emerald-500/30 group-hover/img:to-green-500/30 rounded-2xl blur-xl transition duration-500"></div>
+                  <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/15 group-hover/img:border-emerald-400 transition">
+                    {isVideo(src)? (
+                      <video src={src} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                    ) : (
+                      <button onClick={() => setZoomImg(src)} className="w-full h-full block">
+                        <img src={src} alt={`img-${label}`} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-black/90 text-white flex items-center justify-center text-base font-black border-2 border-emerald-400 group-hover/img:border-green-400 group-hover/img:shadow-[0_0_12px_rgba(16,185,129,0.8)] transition">
+                    {label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </>
     )}
   </>
 )}
 
 {revealed && (
-  <div className="w-full max-w-md mt-4 animate-in fade-in slide-in-from-bottom-2 space-y-3">
+  <div className="w-full max-w-2xl mt-4 animate-in fade-in slide-in-from-bottom-2 space-y-3">
     <div className="relative overflow-hidden bg-gradient-to-b from-emerald-950/80 to-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 backdrop-blur-xl">
       <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-400 to-transparent"></div>
       <div className="flex items-start gap-3">
@@ -186,7 +223,6 @@ export default function Question() {
         </div>
         <div className="text-right flex-1">
   <div className="text-xs font-bold text-emerald-400 mb-1 tracking-wide">الإجابة الصحيحة</div>
-  {/* هنا التعديل */}
   <div
     className="text-lg font-black text-white leading-snug"
     dangerouslySetInnerHTML={{ __html: question.answer }}
@@ -195,17 +231,43 @@ export default function Question() {
       </div>
     </div>
 
-    {(isDual? correctSrc : question.answerImage) && (
+    {(isDual? correctSrc : aImages.length>0) && (
       <div className="w-full flex justify-center">
-        <div className={isDual? "inline-block rounded-2xl border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.4)] p-0.5 bg-black/30" : "inline-block rounded-2xl border border-emerald-500/30 p-0.5 bg-black/20"}>
-          {isVideo(isDual? correctSrc : question.answerImage)? (
-            <video ref={answerVideoRef} key={question.id + "-ans"} src={(isDual? correctSrc : question.answerImage)!} className="block max-h-64 w-auto max-w- object-contain rounded-xl" autoPlay loop playsInline controls />
-          ) : (
-            <button onClick={() => setZoomImg((isDual? correctSrc : question.answerImage)!)}>
-              <img src={(isDual? correctSrc : question.answerImage)!} className="block max-h-64 w-auto max-w- object-contain rounded-xl" alt="صورة الإجابة" />
-            </button>
-          )}
-        </div>
+        {aImages.length <= 1 &&!isDual? (
+          <div className="inline-block rounded-2xl border border-emerald-500/30 p-0.5 bg-black/20">
+            {isVideo(aImages[0])? (
+              <video ref={answerVideoRef} key={question.id + "-ans"} src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" autoPlay loop playsInline controls />
+            ) : (
+              <button onClick={() => setZoomImg(aImages[0]?? null)}>
+                <img src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" alt="صورة الإجابة" />
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-center gap-4 w-full">
+            {(isDual? [correctSrc!] : aImages).map((src, i) => {
+              const label = String.fromCharCode(65 + i);
+              return (
+                <div key={i} className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
+                  <div className="w-full h-full rounded-2xl border border-emerald-500/40 overflow-hidden">
+                    {isVideo(src)? (
+                      <video src={src} className="w-full h-full object-fill" autoPlay loop playsInline controls />
+                    ) : (
+                      <button onClick={() => setZoomImg(src)} className="w-full h-full block">
+                        <img src={src} className="w-full h-full object-fill" alt="صورة الإجابة" />
+                      </button>
+                    )}
+                  </div>
+                  {!isDual && aImages.length > 1 && (
+                    <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-black/80 text-white flex items-center justify-center text-sm font-bold border border-emerald-400">
+                      {label}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     )}
   </div>
@@ -239,11 +301,11 @@ export default function Question() {
         <aside className="lg:w-72 flex flex-col gap-3">
           <div className="bg-white/[0.05] glass rounded-2xl p-4 border border-white/10">
             <h4 className="font-bold mb-3 text-center text-sm text-white/60">وسائل المساعدة</h4>
-            <div className="grid grid-cols-3 gap-2">
-              {(['swap','call','twoAnswers'] as const).map((aid,i)=>(
-                <button key={aid} disabled={!(currentTurn===1?team1:team2).aids[aid]} onClick={()=>{useAid(currentTurn,aid); if(aid==='swap')swapActiveQuestion();}} className="flex-col h-auto py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl disabled:opacity-40">
-                  <span className="text-2xl">{['🔄','📞','✌️'][i]}</span>
-                  <span className="text-xs mt-1 block">{['تبديل','اتصال','إجابتين'][i]}</span>
+            <div className="grid grid-cols-2 gap-2">
+              {(['swap','pit','twoAnswers','trap'] as const).map((aid,i)=>(
+                <button key={aid} disabled={!(currentTurn===1?team1:team2).aids[aid] || aid==='pit'} onClick={()=>{useAid(currentTurn,aid); if(aid==='swap')swapActiveQuestion();}} className="flex-col h-auto py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl disabled:opacity-40">
+                  <span className="text-2xl">{['🔄','🕳️','✌️','🪤'][i]}</span>
+                  <span className="text-xs mt-1 block">{['تبديل','حفرة','إجابتين','فخ'][i]}</span>
                 </button>
               ))}
             </div>
@@ -256,9 +318,9 @@ export default function Question() {
       {zoomImg && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onClick={()=>setZoomImg(null)}>
           {isVideo(zoomImg)? (
-            <video src={zoomImg} className="max-w-full max-h-full" controls autoPlay />
+            <video src={zoomImg} className={`max-w-full max-h-full ${isColorQuestion && qImages.includes(zoomImg)? 'grayscale' : ''}`} controls autoPlay />
           ) : (
-            <img src={zoomImg} className="max-w-full max-h-full object-contain rounded-2xl" />
+            <img src={zoomImg} className={`max-w-full max-h-full object-contain rounded-2xl ${isColorQuestion && qImages.includes(zoomImg)? 'grayscale' : ''}`} />
           )}
         </div>
       )}

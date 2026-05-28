@@ -12,20 +12,41 @@ export function QuestionTimer({ duration, onTimeUp }: Props) {
   const [running, setRunning] = useState(true);
   const ref = useRef<number | null>(null);
   const firedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // حضر الصوت مرة واحدة
+  useEffect(() => {
+    audioRef.current = new Audio("/sounds/tick.mp3");
+    audioRef.current.volume = 0.5;
+  }, []);
 
   useEffect(() => {
     if (!running) return;
     ref.current = window.setInterval(() => {
       setRemaining((r) => {
-        if (r <= 1) {
-          if (!firedRef.current) { firedRef.current = true; onTimeUp?.(); }
-          return 0;
+        const next = r <= 1? 0 : r - 1;
+
+        // شغل صوت tick آخر 5 ثواني
+        if (next <= 5 && next > 0 && audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(() => {});
         }
-        return r - 1;
+
+        if (next === 0) {
+          if (!firedRef.current) { firedRef.current = true; onTimeUp?.(); }
+        }
+        return next;
       });
     }, 1000);
     return () => { if (ref.current) window.clearInterval(ref.current); };
   }, [running, onTimeUp]);
+
+  // اسمع إيفنت إعادة التايمر من الوسائل
+  useEffect(() => {
+    const resetTimer = () => { firedRef.current = false; setRemaining(duration); setRunning(true); };
+    window.addEventListener('aid-used-reset-timer', resetTimer);
+    return () => window.removeEventListener('aid-used-reset-timer', resetTimer);
+  }, [duration]);
 
   const reset = () => { firedRef.current = false; setRemaining(duration); setRunning(true); };
   const minutes = Math.floor(remaining / 60).toString().padStart(2, "0");
@@ -37,12 +58,12 @@ export function QuestionTimer({ duration, onTimeUp }: Props) {
       "glass-strong rounded-full px-4 py-2 flex items-center gap-3",
       danger && "ring-2 ring-destructive animate-pulse",
     )}>
-      <button onClick={() => setRunning((r) => !r)} className="text-foreground hover:text-primary transition">
-        {running ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+      <button onClick={() => setRunning((r) =>!r)} className="text-foreground hover:text-primary transition">
+        {running? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
       </button>
       <span className={cn(
         "text-xl sm:text-2xl font-black tabular-nums",
-        danger ? "text-destructive" : "text-foreground"
+        danger? "text-destructive" : "text-foreground"
       )}>
         {minutes}:{seconds}
       </span>

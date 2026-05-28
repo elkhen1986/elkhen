@@ -9,7 +9,7 @@ export interface Category {
 
 export interface CategoryGroup {
   title: string;
-  color: string; // 👈 لون المجموعة الأساسي
+  color: string;
   categories: Category[];
 }
 
@@ -106,6 +106,8 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
       { id: "iq", name: "اختبار ذكاء", image: "iq.jpg", color: "from-fuchsia-800 to-fuchsia-700" },
       { id: "observation", name: "قوة ملاحظة", image: "observation.jpg", color: "from-fuchsia-700 to-fuchsia-600" },
       { id: "differences", name: "أوجد الاختلاف", image: "differences.jpg", color: "from-fuchsia-600 to-fuchsia-500" },
+      { id: "reversedwords", name: "كلمات معكوسة", image: "reversedwords.jpg", color: "from-fuchsia-500 to-fuchsia-400" },
+
     ],
   },
   {
