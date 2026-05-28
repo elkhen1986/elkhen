@@ -25,3 +25,6 @@ dist-ssr
 .vercel
 
 functions/serviceAccountKey.json
+
+questions/
+trial/
