@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useGameStore } from "@/store/gameStore";
 import { auth } from "@/main";
-import { onAuthStateChanged, signOut } from "firebase/auth"; // ✅ إضافة signOut
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Victory from "@/pages/Victory";
+import GameHub from "./pages/GameHub"; // ✅ أضفنا GameHub
 
 const queryClient = new QueryClient();
 
@@ -35,20 +36,19 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       const isTrial = localStorage.getItem("elkhen_trial") === "true";
-      if (isTrial && u) { // ✅ التجربة تطرد المستخدم الحقيقي
+      if (isTrial && u) {
         await signOut(auth);
         setUser({ isTrial: true });
       } else if (u &&!isTrial) {
-        // === فحص الاشتراك الجديد - لا يمسح الكود القديم ===
         try {
           const userDoc = await getDoc(doc(db, "users", u.uid));
           const userData = userDoc.data();
           const now = new Date();
           const end = userData?.subscriptionEnd?.toDate
-         ? userData.subscriptionEnd.toDate()
+           ? userData.subscriptionEnd.toDate()
             : userData?.subscriptionEnd?.seconds
            ? new Date(userData.subscriptionEnd.seconds * 1000)
-              : null;
+            : null;
 
           if (!userData?.isAdmin && (!userData?.isActive ||!end || end <= now)) {
             await signOut(auth);
@@ -59,9 +59,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
             setUser(u);
           }
         } catch {
-          setUser(u); // لو فشل الفحص، سيبه يدخل والفحص هيكمل في الصفحات
+          setUser(u);
         }
-        // === نهاية فحص الاشتراك ===
       } else {
         setUser(u || (isTrial? { isTrial: true } : null));
       }
@@ -83,6 +82,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   const theme = useGameStore((s) => s.theme);
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -92,15 +92,22 @@ const App = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
-            <Route path="/" element={<PrivateRoute><Index /></PrivateRoute>} />
+
+            {/* ✅ الصفحة الرئيسية بقت GameHub */}
+            <Route path="/" element={<PrivateRoute><GameHub /></PrivateRoute>} />
+
+            {/* ✅ صفحة الفئات القديمة اتنقلت هنا */}
+            <Route path="/categories" element={<PrivateRoute><Index /></PrivateRoute>} />
+
             <Route path="/board" element={<PrivateRoute><Board /></PrivateRoute>} />
             <Route path="/question" element={<PrivateRoute><Question /></PrivateRoute>} />
+            <Route path="/victory" element={<PrivateRoute><Victory /></PrivateRoute>} />
             <Route path="*" element={<NotFound />} />
-            <Route path="/victory" element={<Victory />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
 };
+
 export default App;

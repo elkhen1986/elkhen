@@ -47,7 +47,7 @@ export function TopBar({ showBackToBoard }: Props) {
         <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center glow-primary">
           <Sparkles className="w-5 h-5 text-primary-foreground" />
         </div>
-        <span className="text-xl font-black text-gradient-primary hidden sm:inline">Elkhen</span>
+        <span className="text-xl font-black text-gradient-primary hidden sm:inline">KHON</span>
       </Link>
 
       <div className="flex items-center gap-2 mr-auto sm:mr-0 sm:order-3">

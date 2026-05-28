@@ -182,7 +182,7 @@ export default function Login(): JSX.Element {
       <div className="w-full max-w-md relative z-10">
         <Card className="w-full relative z-10 glass-strong border-primary/20 shadow-2xl transition-all duration-500 hover:shadow-[0_0_60px_rgba(16,185,129,0.3)] hover:border-primary/50 hover:-translate-y-1">
           <CardHeader className="text-center space-y-3 pb-6">
-            <CardTitle className="text-5xl font-black text-gradient-primary">Elkhen</CardTitle>
+            <CardTitle className="text-5xl font-black text-gradient-primary">KHON</CardTitle>
             <p className="text-xl font-extrabold">
               <span className="text-red-800">خلِّكـ </span>
               <span className="text-yellow-800 mx-1.5">قد </span>

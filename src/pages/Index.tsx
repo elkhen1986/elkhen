@@ -260,7 +260,7 @@ useEffect(() => {
               <span className="text-violet-600 font-black text-5xl md:text-xl tracking-tight">التحديـ</span>
               </div>
           <h1 className="text-5xl sm:text-7xl font-black text-gradient-primary tracking-tight">
-            Elkhen
+            KHON
           </h1>
           <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
              فكر... العب... استمتع
