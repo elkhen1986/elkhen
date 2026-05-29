@@ -44,8 +44,9 @@ export default function Login(): JSX.Element {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      if (user && localStorage.getItem("isLoggedIn") === "true") {
-        navigate("/", { replace: true });
+      const isTrial = localStorage.getItem("elkhen_trial") === "true";
+      if ((user && localStorage.getItem("isLoggedIn") === "true") || isTrial) {
+        navigate("/hub", { replace: true });
       } else {
         setCheckingAuth(false);
       }
@@ -68,9 +69,9 @@ export default function Login(): JSX.Element {
       const userData = userDoc.data();
       const now = new Date();
       const subscriptionEnd = userData?.subscriptionEnd?.toDate
-      ? userData.subscriptionEnd.toDate()
+     ? userData.subscriptionEnd.toDate()
         : userData?.subscriptionEnd?.seconds
-        ? new Date(userData.subscriptionEnd.seconds * 1000)
+       ? new Date(userData.subscriptionEnd.seconds * 1000)
           : null;
 
       if (!userData?.isAdmin && (!userData?.isActive ||!subscriptionEnd || subscriptionEnd <= now)) {
@@ -87,7 +88,7 @@ export default function Login(): JSX.Element {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.removeItem("elkhen_trial");
       toast.success("تم تسجيل الدخول");
-      navigate("/", { replace: true });
+      navigate("/hub", { replace: true });
     } catch (err: any) {
       await auth.signOut();
       localStorage.removeItem("isLoggedIn");
@@ -152,7 +153,7 @@ export default function Login(): JSX.Element {
 
       setTimeout(() => {
         setLoading(false);
-        navigate("/", { replace: true });
+        navigate("/hub", { replace: true });
       }, 400);
 
     } catch (err) {
@@ -162,7 +163,7 @@ export default function Login(): JSX.Element {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("elkhen_user", "trial@elkhen.app");
       setLoading(false);
-      navigate("/", { replace: true });
+      navigate("/hub", { replace: true });
     }
   };
 

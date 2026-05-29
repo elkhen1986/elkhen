@@ -13,10 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Trash2, RefreshCw, Users, FileSpreadsheet, BarChart3, Shield, Download, Edit, Eye, ArrowRight, Save, X, UserPlus, Calendar, Clock, Activity, ArrowUpDown } from "lucide-react";
+import { Upload, Trash2, RefreshCw, Users, FileSpreadsheet, BarChart3, Shield, Download, Edit, Eye, ArrowRight, Save, X, UserPlus, Calendar, Clock, Activity, ArrowUpDown, LogOut, Maximize, Minimize } from "lucide-react";
 import { loadCategory, Question } from "@/lib/questionsLoader";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
+import { ThemeSelector } from "@/components/ThemeSelector";
 
 const ADMIN_EMAILS = ["elkhen@elkhen.app"];
 
@@ -58,6 +59,7 @@ export default function Admin() {
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc'|'desc'}>({ key: 'createdAt', direction: 'desc' });
   const [alert, setAlert] = useState<{open: boolean, title: string, msg: string, type: 'success' | 'error'}>({ open: false, title: '', msg: '', type: 'success' });
   const [confirmDialog, setConfirmDialog] = useState<{open: boolean, title: string, msg: string, onConfirm: () => void}>({ open: false, title: '', msg: '', onConfirm: () => {} });
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const showAlert = (title: string, msg: string, type: 'success' | 'error' = 'success') => {
     setAlert({ open: true, title, msg, type });
@@ -82,6 +84,27 @@ export default function Admin() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch {}
+  };
+
+  const handleLogout = async () => {
+    try { await auth.signOut(); } catch {}
+    localStorage.removeItem('elkhen_trial');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('elkhen_user');
+    navigate('/', { replace: true });
+  };
 
   const isAdmin = useMemo(() => user && ADMIN_EMAILS.includes(user.email || ""), [user]);
 
@@ -210,7 +233,7 @@ export default function Admin() {
 
   const handleResetUser = async (uid: string, cat?: string) => {
   const msg = cat
-   ? `متأكد عايز تصفر فئة "${cat}" ؟\nالعملية دي مش هترجع`
+  ? `متأكد عايز تصفر فئة "${cat}" ؟\nالعملية دي مش هترجع`
     : `متأكد عايز تصفر كل الفئات للمستخدم ده ؟`;
 
   showConfirm('تأكيد التصفير', msg, async () => {
@@ -284,43 +307,63 @@ export default function Admin() {
     XLSX.writeFile(wb, `${selectedCat}-export.xlsx`);
   };
 
-  const handleSaveQuestion = async () => {
-    if (!editingQuestion ||!selectedCat) return;
-    try {
-      const updatedQuestions = questions.map(q =>
-        q.id === editingQuestion.id? editingQuestion : q
-      );
-      setQuestions(updatedQuestions);
-      const grouped = {200: [], 400: [], 600: []} as Record<number, any[]>;
-      updatedQuestions.forEach(q => {
-        if (grouped[q.points]) {
-          grouped[q.points].push({
-            question: q.question,
-            answer: q.answer,
-            image: q.image?.join(",") || "",
-            answerImage: q.answerImage?.join(",") || ""
-          });
-        }
-      });
-      const wb = XLSX.utils.book_new();
-      [200, 400, 600].forEach(points => {
-        if (grouped[points].length > 0) {
-          const ws = XLSX.utils.json_to_sheet(grouped[points]);
-          XLSX.utils.book_append_sheet(wb, ws, String(points));
-        }
-      });
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const file = new Blob([wbout], { type: 'application/octet-stream' });
-      await uploadBytes(ref(storage, `questions/${selectedCat}.xlsx`), file);
-      localStorage.removeItem(`elkhen-cache-${selectedCat}`);
-      if ('caches' in window) { try { await caches.delete('elkhen-questions-v1'); } catch {} }
-      showAlert('تم', 'تم حفظ التعديل', 'success');
-      setEditingQuestion(null);
-      setTimeout(() => loadCategory(selectedCat).then(setQuestions), 500);
-    } catch (e) {
-      showAlert('خطأ', 'فشل الحفظ', 'error');
+ const handleSaveQuestion = async () => {
+  if (!editingQuestion ||!selectedCat) return;
+  try {
+    // 1) حدث الواجهة فورا
+    const updatedQuestions = questions.map(q =>
+      q.id === editingQuestion.id? editingQuestion : q
+    );
+    setQuestions(updatedQuestions);
+
+    // 2) جهز الملف الجديد متقسم 200/400/600
+    const grouped = {200: [], 400: [], 600: []} as Record<number, any[]>;
+    updatedQuestions.forEach(q => {
+      if (grouped[q.points]) {
+        grouped[q.points].push({
+          question: q.question,
+          answer: q.answer,
+          image: q.image?.join(",") || "",
+          answerImage: q.answerImage?.join(",") || ""
+        });
+      }
+    });
+
+    const wb = XLSX.utils.book_new();
+    [200, 400, 600].forEach(points => {
+      if (grouped[points].length > 0) {
+        const ws = XLSX.utils.json_to_sheet(grouped[points]);
+        XLSX.utils.book_append_sheet(wb, ws, String(points));
+      }
+    });
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const file = new Blob([wbout], { type: 'application/octet-stream' });
+
+    // 3) ارفع وامنع الكاش
+    await uploadBytes(
+      ref(storage, `questions/${selectedCat}.xlsx`),
+      file,
+      { contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', cacheControl: 'no-cache' }
+    );
+
+    // 4) امسح كل الكاش المحلي
+    localStorage.removeItem(`elkhen-cache-${selectedCat}`);
+    if ('caches' in window) {
+      try { await caches.delete('elkhen-questions-v1'); } catch {}
     }
-  };
+
+    showAlert('تم', 'تم حفظ التعديل', 'success');
+    setEditingQuestion(null);
+
+    // ❌ شيل السطر ده - هو اللي بيرجع البيانات القديمة
+    // setTimeout(() => loadCategory(selectedCat).then(setQuestions), 500);
+
+  } catch (e) {
+    console.error(e);
+    showAlert('خطأ', 'فشل الحفظ', 'error');
+  }
+};
 
   if (loading) return <div className="flex items-center justify-center h-screen">جاري التحميل...</div>;
   if (!isAdmin) {
@@ -335,7 +378,7 @@ export default function Admin() {
   }
 
   const filteredQuestions = pointsFilter === "all"
-  ? questions
+ ? questions
     : questions.filter(q => q.points === parseInt(pointsFilter));
 
   const countsByPoints = {
@@ -348,25 +391,40 @@ export default function Admin() {
     sortConfig.key === column? <span className="ml-1">{sortConfig.direction === 'asc'? '↑' : '↓'}</span> : <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8" dir="rtl">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => navigate("/")} className="rounded-full">
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <Shield className="w-8 h-8 text-primary" />
-                لوحة تحكم الخن
-              </h1>
-              <p className="text-muted-foreground mt-1">إدارة كاملة للأسئلة والمستخدمين</p>
-            </div>
+    <div className="min-h-screen bg-background p-4 md:p-8 relative" dir="rtl">
+      {/* ✅ هيدر علوي زي انديكس */}
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+        <ThemeSelector />
+        <Button onClick={() => navigate(-1)} variant="outline" size="sm" className="glass rounded-full gap-2 hover:bg-primary/20">
+          <ArrowRight className="w-4 h-4" />
+          <span className="hidden sm:inline text-xs font-bold">رجوع</span>
+        </Button>
+      </div>
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+        {user && (
+          <div className="flex items-center gap-2 glass rounded-full pl-3 pr-2 py-1">
+            <span className="text-xs font-bold hidden sm:block">{user.email?.split('@')[0]}</span>
+            <img src={user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`} className="w-8 h-8 rounded-full object-cover border-2 border-primary/40" alt="avatar" />
           </div>
-          <Badge variant="outline" className="text-sm">
-            {users.length} مستخدم
-          </Badge>
-        </div>
+        )}
+        <Button onClick={handleLogout} variant="outline" size="icon" className="glass rounded-full w-10 h-10 hover:bg-red-500/20 hover:border-red-500/50 group" title="تسجيل خروج">
+          <LogOut className="w-5 h-5 text-muted-foreground group-hover:text-red-400" />
+        </Button>
+        <Button onClick={toggleFullscreen} variant="outline" size="icon" className="glass rounded-full w-10 h-10" title={isFullscreen? "خروج ملء الشاشة" : "ملء الشاشة"}>
+          {isFullscreen? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+        </Button>
+      </div>
+
+      <div className="max-w-7xl mx-auto pt-5">
+        <div className="relative flex items-center justify-center mb-8 h-12">
+  <h1 className="text-3xl font-bold flex items-center gap-3">
+    <Shield className="w-8 h-8 text-primary" />
+    لوحة تحكم الخن
+  </h1>
+  <Badge variant="outline" className="text-sm absolute left-5">
+    {users.length} مستخدم
+  </Badge>
+</div>
 
         <Tabs defaultValue="questions" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 lg:w-">
@@ -575,7 +633,7 @@ export default function Admin() {
 
       {selectedUser && (
   <div onClick={() => setSelectedUser(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-    <div onClick={e => e.stopPropagation()} dir="rtl" style={{ background: 'hsl(var(--background))', color: 'hsl(var(--foreground))', width: '100%', maxWidth: '820px', height: '95vh', maxHeight: '95vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid hsl(var(--border))', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+    <div onClick={e => e.stopPropagation()} dir="rtl" style={{ background: 'hsl(var(--background))', color: 'hsl(var(--foreground))', width: '100%', maxWidth: '820px', height: '95vh', maxHeight: '95vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid hsl(var(--border))', boxShadow: '0 25px 50px -12px rgba(0,0,0.5)' }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid hsl(var(--border))', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ fontSize: 18, fontWeight: 700 }}>تفاصيل الحساب</h2>
         <button onClick={() => setSelectedUser(null)} style={{ width: 32, height: 32, borderRadius: 8, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18 }}>✕</button>
@@ -658,7 +716,7 @@ export default function Admin() {
           <DialogHeader><DialogTitle>إنشاء حساب جديد</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><Label>اسم المستخدم</Label><Input value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} placeholder="ahmed" className="mt-1" dir="ltr" /></div>
-            <div><Label>كلمة المرور</Label><Input type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="••••••••" className="mt-1" dir="ltr" /></div>
+            <div><Label>كلمة المرور</Label><Input type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="••••" className="mt-1" dir="ltr" /></div>
             <p className="text-xs text-muted-foreground">سيتم إنشاء الحساب تلقائياً</p>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setShowNewUserDialog(false)}>إلغاء</Button><Button onClick={handleCreateUser}>إنشاء</Button></DialogFooter>
@@ -672,10 +730,10 @@ export default function Admin() {
               <div style={{ width: 64, height: 64, borderRadius: '50%', margin: '0 auto 16px', display: 'grid', placeItems: 'center', background: alert.type === 'success'? '#16a34a15' : '#dc262615', border: `2px solid ${alert.type === 'success'? '#16a34a' : '#dc2626'}` }}>
                 {alert.type === 'success'?
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg> :
-                  <svg width="32" height="32" viewBox="0 0 24" fill="none" stroke="#dc2626" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <svg width="32" height="32" viewBox="0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 }
               </div>
-              <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>{alert.title}</h3>
+              <h3 style={{ margin: '0 8px', fontSize: 20, fontWeight: 700 }}>{alert.title}</h3>
               <p style={{ margin: 0, opacity: 0.8, fontSize: 14, lineHeight: 1.5 }}>{alert.msg}</p>
             </div>
             <div style={{ padding: 16, borderTop: '1px solid hsl(var(--border))' }}>
@@ -690,9 +748,9 @@ export default function Admin() {
           <div onClick={e => e.stopPropagation()} dir="rtl" style={{ background: 'hsl(var(--background))', borderRadius: 16, width: '100%', maxWidth: 400, border: '1px solid hsl(var(--border))', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
             <div style={{ padding: '24px', textAlign: 'center' }}>
               <div style={{ width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px', display: 'grid', placeItems: 'center', background: '#f59e0b15', border: '2px solid #f59e0b' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2"><path d="M12 9v4M12 17h.01M21 12a9 9 0 11-18 0 9 0 0118 0z"/></svg>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2"><path d="M12 9v4M12 17h.01M21 12a9 0 11-18 0 9 0 0118 0z"/></svg>
               </div>
-              <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700 }}>{confirmDialog.title}</h3>
+              <h3 style={{ margin: '0 8px', fontSize: 18, fontWeight: 700 }}>{confirmDialog.title}</h3>
               <p style={{ margin: 0, opacity: 0.8, fontSize: 14, whiteSpace: 'pre-line' }}>{confirmDialog.msg}</p>
             </div>
             <div style={{ padding: 16, display: 'flex', gap: 8, borderTop: '1px solid hsl(var(--border))' }}>

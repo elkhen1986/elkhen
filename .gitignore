@@ -28,3 +28,8 @@ functions/serviceAccountKey.json
 
 questions/
 trial/
+
+# Firebase secrets
+.env
+.env.local
+.env.production

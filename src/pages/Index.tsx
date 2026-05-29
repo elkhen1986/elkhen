@@ -43,7 +43,7 @@ const Index = () => {
 useEffect(() => {
     const email = localStorage.getItem("elkhen_user");
     if (!email) {
-      navigate("/login", { replace: true });
+      navigate("/", { replace: true });
       return;
     }
 
@@ -106,11 +106,13 @@ useEffect(() => {
   };
 
   const handleLogout = async () => {
+    try { await auth.signOut(); } catch {}
     localStorage.removeItem("elkhen_user");
     localStorage.removeItem("elkhen_device");
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("elkhen_photo");
-    navigate("/login", { replace: true });
+    localStorage.removeItem("elkhen_trial");
+    navigate("/", { replace: true });
   };
 
   const handleAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,9 +156,9 @@ useEffect(() => {
     if (!isTrial && user) {
       const now = new Date();
       const end = subInfo?.subscriptionEnd?.toDate
-       ? subInfo.subscriptionEnd.toDate()
+     ? subInfo.subscriptionEnd.toDate()
         : subInfo?.subscriptionEnd?.seconds
-         ? new Date(subInfo.subscriptionEnd.seconds * 1000)
+       ? new Date(subInfo.subscriptionEnd.seconds * 1000)
           : null;
 
       if (!subInfo?.isActive ||!end || end <= now) {
@@ -188,8 +190,19 @@ useEffect(() => {
           </div>
         </div>
       )}
-      <div className="absolute top-4 left-4 z-50">
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
         <ThemeSelector />
+        {/* ✅ زرار الرجوع للساحة */}
+        <Button
+          onClick={() => navigate("/hub")}
+          variant="outline"
+          size="sm"
+          className="glass rounded-full gap-2 hover:bg-primary/20 hover:border-primary"
+          title="الرجوع للساحة"
+        >
+          <Sparkles className="w-4 h-4 text-primary" />
+          <span className="hidden sm:inline text-xs font-bold">الساحة</span>
+        </Button>
       </div>
 
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
@@ -306,7 +319,7 @@ useEffect(() => {
                   className={cn(
                     "px-4 py-1.5 rounded-full font-bold text-sm transition",
                     timerDuration === d
-          ? "bg-gradient-primary text-primary-foreground glow-primary"
+       ? "bg-gradient-primary text-primary-foreground glow-primary"
                       : "glass text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -323,7 +336,7 @@ useEffect(() => {
             <div className={cn(
               "px-4 py-1.5 rounded-full font-black text-sm transition",
               selectedCategories.length === 6
-    ? "bg-success/20 text-success ring-1 ring-success"
+ ? "bg-success/20 text-success ring-1 ring-success"
                 : "glass text-muted-foreground"
             )}>
               {selectedCategories.length} / 6
@@ -376,9 +389,9 @@ useEffect(() => {
               }
 
               const end = subInfo?.subscriptionEnd?.toDate
-               ? subInfo.subscriptionEnd.toDate()
+             ? subInfo.subscriptionEnd.toDate()
                 : subInfo?.subscriptionEnd?.seconds
-                 ? new Date(subInfo.subscriptionEnd.seconds * 1000)
+               ? new Date(subInfo.subscriptionEnd.seconds * 1000)
                   : null;
               const remaining = end? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000)) : 0;
               const isActive = subInfo?.isActive && remaining > 0;

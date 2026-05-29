@@ -17,7 +17,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Victory from "@/pages/Victory";
-import GameHub from "./pages/GameHub"; // ✅ أضفنا GameHub
+import GameHub from "./pages/GameHub";
 
 const queryClient = new QueryClient();
 
@@ -27,27 +27,30 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'elkhen_trial') {
+      if (e.key === 'elkhen_trial' || e.key === 'isLoggedIn') {
         const isTrial = localStorage.getItem('elkhen_trial') === 'true';
-        setUser(isTrial? { isTrial: true } : auth.currentUser);
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        setUser(isTrial && isLoggedIn? { isTrial: true } : auth.currentUser);
       }
     };
     window.addEventListener('storage', onStorage);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       const isTrial = localStorage.getItem("elkhen_trial") === "true";
+      const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+
       if (isTrial && u) {
         await signOut(auth);
-        setUser({ isTrial: true });
+        setUser(isTrial && isLoggedIn? { isTrial: true } : null);
       } else if (u &&!isTrial) {
         try {
           const userDoc = await getDoc(doc(db, "users", u.uid));
           const userData = userDoc.data();
           const now = new Date();
           const end = userData?.subscriptionEnd?.toDate
-           ? userData.subscriptionEnd.toDate()
+         ? userData.subscriptionEnd.toDate()
             : userData?.subscriptionEnd?.seconds
-           ? new Date(userData.subscriptionEnd.seconds * 1000)
+         ? new Date(userData.subscriptionEnd.seconds * 1000)
             : null;
 
           if (!userData?.isAdmin && (!userData?.isActive ||!end || end <= now)) {
@@ -62,7 +65,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
           setUser(u);
         }
       } else {
-        setUser(u || (isTrial? { isTrial: true } : null));
+        setUser(u || (isTrial && isLoggedIn? { isTrial: true } : null));
       }
       setLoading(false);
     });
@@ -76,7 +79,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  return user? children : <Navigate to="/login" replace />;
+  // ✅ لو مش مسجل يرجع لصفحة الدخول اللي بقت "/"
+  return user? children : <Navigate to="/" replace />;
 };
 
 const App = () => {
@@ -90,15 +94,15 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/login" element={<Login />} />
+            {/* ✅ أول صفحة بقت تسجيل الدخول */}
+            <Route path="/" element={<Login />} />
+            <Route path="/login" element={<Navigate to="/" replace />} />
+
+            {/* ✅ الساحة بقت بعد الدخول */}
+            <Route path="/hub" element={<PrivateRoute><GameHub /></PrivateRoute>} />
+
             <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
-
-            {/* ✅ الصفحة الرئيسية بقت GameHub */}
-            <Route path="/" element={<PrivateRoute><GameHub /></PrivateRoute>} />
-
-            {/* ✅ صفحة الفئات القديمة اتنقلت هنا */}
             <Route path="/categories" element={<PrivateRoute><Index /></PrivateRoute>} />
-
             <Route path="/board" element={<PrivateRoute><Board /></PrivateRoute>} />
             <Route path="/question" element={<PrivateRoute><Question /></PrivateRoute>} />
             <Route path="/victory" element={<PrivateRoute><Victory /></PrivateRoute>} />
