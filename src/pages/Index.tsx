@@ -171,7 +171,6 @@ useEffect(() => {
 
     setIsLoadingQuestions(true);
     startGame();
-    await preloadFirebaseCategories(selectedCategories);
     setIsLoadingQuestions(false);
     navigate("/board");
   };
