@@ -18,7 +18,7 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Victory from "@/pages/Victory";
 import GameHub from "./pages/GameHub";
-import PhoneRegister from './pages/PhoneRegister'
+import PhoneRegister from '@/pages/PhoneRegister'
 
 
 const queryClient = new QueryClient();

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { auth } from '../lib/firebase'
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth'
-import { getFunctions, httpsCallable } from 'firebase/functions'
+import { httpsCallable } from 'firebase/functions'
+import { auth, functions } from "@/main"
 
 export default function PhoneRegister() {
   const [step, setStep] = useState<'phone'|'code'|'info'>('phone')
@@ -45,10 +45,9 @@ export default function PhoneRegister() {
     if (password.length < 8) return alert('الباسورد 8 حروف على الأقل')
     try {
       setLoading(true)
-      const functions = getFunctions()
       const fn = httpsCallable(functions, 'finalizePhoneSignup')
-      const deviceId = localStorage.getItem('deviceId') || crypto.randomUUID()
-      localStorage.setItem('deviceId', deviceId)
+      const deviceId = localStorage.getItem('elkhen_device') || crypto.randomUUID()
+      localStorage.setItem('elkhen_device', deviceId)
       await fn({ phone, name, password, deviceId })
       alert('تم إنشاء الحساب! سجل دخول دلوقتي')
       window.location.href = '/login'
@@ -58,31 +57,34 @@ export default function PhoneRegister() {
   }
 
   return (
-    <div style={{maxWidth:400,margin:'50px auto',padding:20}}>
-      <h2>إنشاء حساب برقم الهاتف</h2>
-      
-      {step==='phone' && (
-        <>
-          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+965XXXXXXXX" style={{width:'100%',padding:10,margin:'10px 0'}}/>
-          <button onClick={sendCode} disabled={loading} style={{width:'100%',padding:12}}>{loading?'...':'إرسال الكود'}</button>
-        </>
-      )}
+    <div className="min-h-screen flex items-center justify-center p-4" dir="rtl">
+      <div className="w-full max-w-md glass-strong p-6 rounded-2xl">
+        <h2 className="text-2xl font-bold mb-4 text-center">إنشاء حساب برقم الهاتف</h2>
+        
+        {step==='phone' && (
+          <>
+            <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+965XXXXXXXX" className="w-full p-3 mb-3 rounded bg-background border"/>
+            <button onClick={sendCode} disabled={loading} className="w-full p-3 bg-primary text-white rounded font-bold">{loading?'...':'إرسال الكود'}</button>
+          </>
+        )}
 
-      {step==='code' && (
-        <>
-          <input value={code} onChange={e=>setCode(e.target.value)} placeholder="الكود" style={{width:'100%',padding:10,margin:'10px 0'}}/>
-          <button onClick={verifyCode} disabled={loading} style={{width:'100%',padding:12}}>تأكيد</button>
-        </>
-      )}
+        {step==='code' && (
+          <>
+            <input value={code} onChange={e=>setCode(e.target.value)} placeholder="الكود" className="w-full p-3 mb-3 rounded bg-background border"/>
+            <button onClick={verifyCode} disabled={loading} className="w-full p-3 bg-primary text-white rounded font-bold">تأكيد</button>
+          </>
+        )}
 
-      {step==='info' && (
-        <>
-          <input value={name} onChange={e=>setName(e.target.value)} placeholder="الاسم (8 حروف+)" style={{width:'100%',padding:10,margin:'10px 0'}}/>
-          <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="كلمة المرور (8 حروف+)" style={{width:'100%',padding:10,margin:'10px 0'}}/>
-          <button onClick={finish} disabled={loading} style={{width:'100%',padding:12}}>إنشاء الحساب</button>
-        </>
-      )}
-      <div id="recaptcha-container"></div>
+        {step==='info' && (
+          <>
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="الاسم (8 حروف+)" className="w-full p-3 mb-3 rounded bg-background border"/>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="كلمة المرور (8 حروف+)" className="w-full p-3 mb-3 rounded bg-background border"/>
+            <button onClick={finish} disabled={loading} className="w-full p-3 bg-primary text-white rounded font-bold">إنشاء الحساب</button>
+          </>
+        )}
+        <div id="recaptcha-container"></div>
+        <p className="text-center mt-4 text-sm">عندك حساب؟ <a href="/login" className="text-primary">سجل دخول</a></p>
+      </div>
     </div>
   )
 }
