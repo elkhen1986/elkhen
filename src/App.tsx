@@ -18,6 +18,8 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Victory from "@/pages/Victory";
 import GameHub from "./pages/GameHub";
+import PhoneRegister from './pages/PhoneRegister'
+
 
 const queryClient = new QueryClient();
 
@@ -107,6 +109,8 @@ const App = () => {
             <Route path="/question" element={<PrivateRoute><Question /></PrivateRoute>} />
             <Route path="/victory" element={<PrivateRoute><Victory /></PrivateRoute>} />
             <Route path="*" element={<NotFound />} />
+            <Route path="/register-phone" element={<PhoneRegister />} />
+
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

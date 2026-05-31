@@ -201,3 +201,57 @@ export const adminSetSubscription = onCall(async (request) => {
 
   return { ok: true, end: end.toDate().toISOString() };
 });
+
+// ===== جديد: تسجيل بالرقم + SMS =====
+export const finalizePhoneSignup = onCall(async (request) => {
+  const { phone, name, password, deviceId } = request.data
+  
+  // لازم يكون عامل verify بالـ SMS الأول
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'يجب التحقق من الرقم أولاً')
+  }
+  if (request.auth.token.phone_number !== phone) {
+    throw new HttpsError('permission-denied', 'الرقم غير متطابق')
+  }
+  
+  if (!name || name.trim().length < 8) {
+    throw new HttpsError('invalid-argument', 'الاسم لازم 8 حروف على الأقل')
+  }
+  if (!password || password.length < 8) {
+    throw new HttpsError('invalid-argument', 'الباسورد لازم 8 حروف على الأقل')
+  }
+
+  // رقم واحد = حساب واحد
+  const existing = await db.collection('users').where('phone', '==', phone).limit(1).get()
+  if (!existing.empty) {
+    throw new HttpsError('already-exists', 'الرقم ده مسجل قبل كده')
+  }
+
+  const email = `${phone.replace('+','') }@phone.elkhen.app`
+  const userRecord = await admin.auth().createUser({
+    phoneNumber: phone,
+    email,
+    password,
+    displayName: name.trim(),
+  })
+
+  const now = admin.firestore.Timestamp.now()
+  const trialEnd = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7*24*60*60*1000)
+
+  await db.collection('users').doc(userRecord.uid).set({
+    phone,
+    displayName: name.trim(),
+    email,
+    isActive: true,
+    isAdmin: false,
+    deviceId: deviceId || null,
+    subscription: {
+      type: 'trial',
+      startDate: now,
+      endDate: trialEnd,
+    },
+    createdAt: now,
+  })
+
+  return { success: true, uid: userRecord.uid }
+})
