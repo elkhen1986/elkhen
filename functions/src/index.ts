@@ -51,8 +51,8 @@ export const adminCreateUser = onCall(async (request) => {
     username: finalUsername.toLowerCase(),
     displayName: finalUsername || '',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    devices: [],
     deviceId: null,
+    // devices: [],  // ← ملغي - مش هنستخدم array تاني
     subscriptionStart: now,
     subscriptionEnd: end,
     isActive: true,
@@ -98,39 +98,38 @@ export const verifyDevice = onCall(async (request) => {
   const snap = await userRef.get();
   const userData = snap.data() || {};
   
-  // === تعديل الأدمن - بدون حذف أي كود قديم ===
   const isAdmin = await checkIsAdmin(uid, request.auth.token);
+
   if (isAdmin) {
-    // الأدمن: تجاهل حد الأجهزة واسمح من أي جهاز
+    // الأدمن: اسمح من أي جهاز، وحدّث بس آخر جهاز
     await userRef.set({ 
       deviceId: deviceId,
-      devices: admin.firestore.FieldValue.arrayUnion(deviceId),
       lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp(),
-      isAdmin: true, // تأكيد
+      isAdmin: true,
     }, { merge: true });
     
-    return { ok: true, admin: true, devices: userData.devices || [] };
+    return { ok: true, admin: true };
   }
-  // === نهاية تعديل الأدمن ===
 
-  const devices = userData.devices || [];
-  const maxDevices = 1;
+  // مستخدم عادي: جهاز واحد بس
+  if (!userData.deviceId) {
+    // أول مرة
+    await userRef.set({
+      deviceId: deviceId,
+      lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    return { ok: true };
+  }
 
-  if (devices.includes(deviceId)) {
-    return { ok: true, devices };
+  if (userData.deviceId !== deviceId) {
+    throw new HttpsError('permission-denied', 'الحساب مفتوح على جهاز آخر');
   }
-  
-  if (devices.length >= maxDevices) {
-    throw new HttpsError('permission-denied', 'Device limit reached');
-  }
-  
-  await userRef.set({ 
-    devices: [...devices, deviceId],
-    deviceId: deviceId,
+
+  // نفس الجهاز
+  await userRef.update({
     lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
-  
-  return { ok: true, devices: [...devices, deviceId] };
+  });
+  return { ok: true };
 });
 
 export const listUsersWithDevices = onCall(async (request) => {
@@ -157,11 +156,14 @@ export const unlinkDevice = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'Admin only');
   }
   
-  const { uid, deviceId } = request.data as { uid: string; deviceId: string };
+  const { uid } = request.data as { uid: string };
   const ref = db.collection('users').doc(uid);
-  const snap = await ref.get();
-  const devices = (snap.data()?.devices || []).filter((d: string) => d !== deviceId);
-  await ref.update({ devices, deviceId: null });
+  
+  // امسح الجهاز المربوط فقط
+  await ref.update({ 
+    deviceId: null,
+    lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp()
+  });
   return { ok: true };
 });
 
