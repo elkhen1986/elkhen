@@ -51,8 +51,8 @@ export const adminCreateUser = onCall(async (request) => {
     username: finalUsername.toLowerCase(),
     displayName: finalUsername || '',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    devices: [],
     deviceId: null,
-    // devices: [],  // ← ملغي - مش هنستخدم array تاني
     subscriptionStart: now,
     subscriptionEnd: end,
     isActive: true,
@@ -98,38 +98,39 @@ export const verifyDevice = onCall(async (request) => {
   const snap = await userRef.get();
   const userData = snap.data() || {};
   
+  // === تعديل الأدمن - بدون حذف أي كود قديم ===
   const isAdmin = await checkIsAdmin(uid, request.auth.token);
-
   if (isAdmin) {
-    // الأدمن: اسمح من أي جهاز، وحدّث بس آخر جهاز
+    // الأدمن: تجاهل حد الأجهزة واسمح من أي جهاز
     await userRef.set({ 
       deviceId: deviceId,
+      devices: admin.firestore.FieldValue.arrayUnion(deviceId),
       lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp(),
-      isAdmin: true,
+      isAdmin: true, // تأكيد
     }, { merge: true });
     
-    return { ok: true, admin: true };
+    return { ok: true, admin: true, devices: userData.devices || [] };
   }
+  // === نهاية تعديل الأدمن ===
 
-  // مستخدم عادي: جهاز واحد بس
-  if (!userData.deviceId) {
-    // أول مرة
-    await userRef.set({
-      deviceId: deviceId,
-      lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    return { ok: true };
+  const devices = userData.devices || [];
+  const maxDevices = 1;
+
+  if (devices.includes(deviceId)) {
+    return { ok: true, devices };
   }
-
-  if (userData.deviceId !== deviceId) {
-    throw new HttpsError('permission-denied', 'الحساب مفتوح على جهاز آخر');
+  
+  if (devices.length >= maxDevices) {
+    throw new HttpsError('permission-denied', 'Device limit reached');
   }
-
-  // نفس الجهاز
-  await userRef.update({
+  
+  await userRef.set({ 
+    devices: [...devices, deviceId],
+    deviceId: deviceId,
     lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp()
-  });
-  return { ok: true };
+  }, { merge: true });
+  
+  return { ok: true, devices: [...devices, deviceId] };
 });
 
 export const listUsersWithDevices = onCall(async (request) => {
@@ -156,14 +157,11 @@ export const unlinkDevice = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'Admin only');
   }
   
-  const { uid } = request.data as { uid: string };
+  const { uid, deviceId } = request.data as { uid: string; deviceId: string };
   const ref = db.collection('users').doc(uid);
-  
-  // امسح الجهاز المربوط فقط
-  await ref.update({ 
-    deviceId: null,
-    lastDeviceCheck: admin.firestore.FieldValue.serverTimestamp()
-  });
+  const snap = await ref.get();
+  const devices = (snap.data()?.devices || []).filter((d: string) => d !== deviceId);
+  await ref.update({ devices, deviceId: null });
   return { ok: true };
 });
 
@@ -201,57 +199,3 @@ export const adminSetSubscription = onCall(async (request) => {
 
   return { ok: true, end: end.toDate().toISOString() };
 });
-
-// ===== جديد: تسجيل بالرقم + SMS =====
-export const finalizePhoneSignup = onCall(async (request) => {
-  const { phone, name, password, deviceId } = request.data
-  
-  // لازم يكون عامل verify بالـ SMS الأول
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'يجب التحقق من الرقم أولاً')
-  }
-  if (request.auth.token.phone_number !== phone) {
-    throw new HttpsError('permission-denied', 'الرقم غير متطابق')
-  }
-  
-  if (!name || name.trim().length < 8) {
-    throw new HttpsError('invalid-argument', 'الاسم لازم 8 حروف على الأقل')
-  }
-  if (!password || password.length < 8) {
-    throw new HttpsError('invalid-argument', 'الباسورد لازم 8 حروف على الأقل')
-  }
-
-  // رقم واحد = حساب واحد
-  const existing = await db.collection('users').where('phone', '==', phone).limit(1).get()
-  if (!existing.empty) {
-    throw new HttpsError('already-exists', 'الرقم ده مسجل قبل كده')
-  }
-
-  const email = `${phone.replace('+','') }@phone.elkhen.app`
-  const userRecord = await admin.auth().createUser({
-    phoneNumber: phone,
-    email,
-    password,
-    displayName: name.trim(),
-  })
-
-  const now = admin.firestore.Timestamp.now()
-  const trialEnd = admin.firestore.Timestamp.fromMillis(now.toMillis() + 7*24*60*60*1000)
-
-  await db.collection('users').doc(userRecord.uid).set({
-    phone,
-    displayName: name.trim(),
-    email,
-    isActive: true,
-    isAdmin: false,
-    deviceId: deviceId || null,
-    subscription: {
-      type: 'trial',
-      startDate: now,
-      endDate: trialEnd,
-    },
-    createdAt: now,
-  })
-
-  return { success: true, uid: userRecord.uid }
-})
