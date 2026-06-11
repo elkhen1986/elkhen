@@ -5,7 +5,7 @@ import { CATEGORY_GROUPS } from "@/data/categories";
 import { CategoryGroupSection } from "@/components/game/CategoryGroupSection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Users2, Timer, Maximize, Minimize, LogOut, Camera, Shield } from "lucide-react";
+import { Sparkles, Users2, Maximize, Minimize, LogOut, Camera, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { storage, auth, db } from "@/lib/firebase";
@@ -15,6 +15,8 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { subscribeToAllRemaining, getRemainingForCategory } from "@/lib/questionsLoader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { AidSelection } from "@/components/setup/AidSelection";
+import { CategoryCard } from "@/components/game/CategoryCard";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -22,8 +24,6 @@ const Index = () => {
   const team2 = useGameStore((s) => s.team2);
   const setTeamName = useGameStore((s) => s.setTeamName);
   const selectedCategories = useGameStore((s) => s.selectedCategories);
-  const timerDuration = useGameStore((s) => s.timerDuration);
-  const setTimerDuration = useGameStore((s) => s.setTimerDuration);
   const startGame = useGameStore((s) => s.startGame);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -32,7 +32,9 @@ const Index = () => {
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [subInfo, setSubInfo] = useState<any>(null);
+  const [showAids, setShowAids] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const selectedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -40,7 +42,7 @@ const Index = () => {
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     const email = localStorage.getItem("elkhen_user");
     if (!email) {
       navigate("/", { replace: true });
@@ -50,7 +52,6 @@ useEffect(() => {
     const loadUser = async () => {
       const fbUser = auth.currentUser;
       const uid = fbUser?.uid || email;
-
       let photoURL: string | undefined = localStorage.getItem("elkhen_photo") || undefined;
 
       try {
@@ -73,13 +74,11 @@ useEffect(() => {
     loadUser();
   }, [navigate]);
 
-  // === تحميل العدادات - LIVE مع تحميل أولي ===
+  // تحميل العدادات LIVE
   useEffect(() => {
     if (!user?.uid) return;
-
     const allCats = CATEGORY_GROUPS.flatMap(g => g.categories.map(c => c.id));
 
-    // 1) حمّل مرة واحدة فورا (عشان العداد يظهر)
     (async () => {
       const initial: Record<string, { remaining: number; total: number }> = {};
       for (const id of allCats) {
@@ -88,10 +87,25 @@ useEffect(() => {
       setCounts(initial);
     })();
 
-    // 2) بعد كده اسمع التغييرات live
     const unsubscribe = subscribeToAllRemaining(allCats, setCounts);
     return () => unsubscribe();
   }, [user?.uid]);
+
+  // preload الفئات المختارة
+  useEffect(() => {
+    if (selectedCategories.length > 0) {
+      preloadFirebaseCategories(selectedCategories);
+    }
+  }, [selectedCategories]);
+
+  // scroll عند اكتمال 6
+  useEffect(() => {
+    if (selectedCategories.length === 6 && selectedRef.current) {
+      setTimeout(() => {
+        selectedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [selectedCategories.length]);
 
   const toggleFullscreen = async () => {
     try {
@@ -120,24 +134,20 @@ useEffect(() => {
     if (!file ||!user) return;
 
     try {
-      // استخدم uid الحقيقي من Firebase لو موجود
       const uid = auth.currentUser?.uid || user.uid;
       const storageRef = ref(storage, `profile_images/${uid}/avatar.jpg`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
 
-      // 1. حدث Firebase Auth
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, { photoURL: url });
       }
 
-      // 2. حدث Firestore
       await setDoc(doc(db, "users", uid),
         { photoURL: url, email: user.email, updatedAt: new Date() },
         { merge: true }
       );
 
-      // 3. حدث الواجهة + localStorage
       localStorage.setItem("elkhen_photo", url);
       setUser({...user, uid, photoURL: url });
     } catch (err: any) {
@@ -151,15 +161,14 @@ useEffect(() => {
   const handleStart = async () => {
     if (!canStart) return;
 
-    // === فحص الاشتراك الجديد ===
     const isTrial = localStorage.getItem("elkhen_trial") === "true";
     if (!isTrial && user) {
       const now = new Date();
       const end = subInfo?.subscriptionEnd?.toDate
-     ? subInfo.subscriptionEnd.toDate()
+      ? subInfo.subscriptionEnd.toDate()
         : subInfo?.subscriptionEnd?.seconds
-       ? new Date(subInfo.subscriptionEnd.seconds * 1000)
-          : null;
+      ? new Date(subInfo.subscriptionEnd.seconds * 1000)
+        : null;
 
       if (!subInfo?.isActive ||!end || end <= now) {
         setShowSubModal(true);
@@ -167,8 +176,11 @@ useEffect(() => {
         return;
       }
     }
-    // === نهاية فحص الاشتراك ===
 
+    setShowAids(true);
+  };
+
+  const handleAidsComplete = async () => {
     setIsLoadingQuestions(true);
     startGame();
     setIsLoadingQuestions(false);
@@ -177,7 +189,7 @@ useEffect(() => {
 
   const username = user?.email?.split("@")[0] || "";
   const photoURL = user?.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${username}`;
-  const isAdmin = user?.email === "elkhen@elkhen.app"; // ← إضافة
+  const isAdmin = user?.email === "elkhen@elkhen.app";
 
   return (
     <div className="min-h-screen relative z-10 px-3 sm:px-6 py-6 sm:py-10">
@@ -191,7 +203,6 @@ useEffect(() => {
       )}
       <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
         <ThemeSelector />
-        {/* ✅ زرار الرجوع للساحة */}
         <Button
           onClick={() => navigate("/hub")}
           variant="outline"
@@ -205,7 +216,6 @@ useEffect(() => {
       </div>
 
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
-        {/* زرار لوحة التحكم - للأدمن فقط */}
         {isAdmin && (
           <Button
             onClick={() => navigate("/admin")}
@@ -219,7 +229,6 @@ useEffect(() => {
           </Button>
         )}
 
-        {/* الاسم والصورة - الضغط يفتح الاشتراك */}
         {user && (
           <div
             className="flex items-center gap-2 glass rounded-full pl-3 pr-1 py-1 cursor-pointer hover:bg-white/10 transition"
@@ -240,7 +249,6 @@ useEffect(() => {
           </div>
         )}
 
-        {/* زرار الخروج */}
         <Button
           onClick={handleLogout}
           variant="outline"
@@ -252,7 +260,6 @@ useEffect(() => {
           <LogOut className="w-5 h-5 text-muted-foreground group-hover:text-red-400 transition-colors" />
         </Button>
 
-        {/* زرار الفول سكرين */}
         <Button
           onClick={toggleFullscreen}
           variant="outline"
@@ -267,105 +274,171 @@ useEffect(() => {
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="text-center space-y-3 animate-fade-in">
           <div className="inline-flex items-center gap-3 glass rounded-full px-7 py-2">
-              <span className="text-red-600 font-black text-5xl md:text-xl tracking-tight">خلِّكـ</span>
-              <span className="text-yellow-500 font-black text-5xl md:text-xl mx-2">قد</span>
-              <span className="text-violet-600 font-black text-5xl md:text-xl tracking-tight">التحديـ</span>
-              </div>
+            <span className="text-red-600 font-black text-5xl md:text-xl tracking-tight">خلِّكـ</span>
+            <span className="text-yellow-500 font-black text-5xl md:text-xl mx-2">قد</span>
+            <span className="text-violet-600 font-black text-5xl md:text-xl tracking-tight">التحديـ</span>
+          </div>
           <h1 className="text-5xl sm:text-7xl font-black text-gradient-primary tracking-tight">
             KHON
           </h1>
           <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-             فكر... العب... استمتع
+            فكر... العب... استمتع
           </p>
         </header>
 
-        <section className="glass-strong rounded-3xl p-5 sm:p-7 space-y-4 animate-fade-in">
-          <div className="flex items-center gap-2">
-            <Users2 className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-bold">أسماء الفرق</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-muted-foreground">الفريق 1</label>
-              <Input
-                value={team1.name}
-                onChange={(e) => setTeamName(1, e.target.value)}
-                placeholder="مثال : حمودة"
-                className="glass border-primary/30 h-12 text-base font-bold focus-visible:ring-primary"
-                maxLength={20}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-muted-foreground">الفريق 2</label>
-              <Input
-                value={team2.name}
-                onChange={(e) => setTeamName(2, e.target.value)}
-                placeholder="مثال : الخن"
-                className="glass border-primary/30 h-12 text-base font-bold focus-visible:ring-primary"
-                maxLength={20}
-              />
-            </div>
-          </div>
+        {!showAids? (
+          <>
+            <section className="glass-strong rounded-3xl p-5 sm:p-7 space-y-4 animate-fade-in">
+              <div className="flex items-center gap-2">
+                <Users2 className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-bold">أسماء الفرق</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-muted-foreground">الفريق 1</label>
+                  <Input
+                    value={team1.name}
+                    onChange={(e) => setTeamName(1, e.target.value)}
+                    placeholder="مثال : حمودة"
+                    className="glass border-primary/30 h-12 text-base font-bold focus-visible:ring-primary"
+                    maxLength={20}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-muted-foreground">الفريق 2</label>
+                  <Input
+                    value={team2.name}
+                    onChange={(e) => setTeamName(2, e.target.value)}
+                    placeholder="مثال : الخن"
+                    className="glass border-primary/30 h-12 text-base font-bold focus-visible:ring-primary"
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+            </section>
 
-          <div className="flex items-center gap-3 pt-2 flex-wrap">
-            <Timer className="w-5 h-5 text-primary" />
-            <span className="text-sm font-bold">مدة المؤقت لكل سؤال :</span>
-            <div className="flex gap-2">
-              {[30, 60, 90].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setTimerDuration(d as 30 | 60 | 90)}
-                  className={cn(
-                    "px-4 py-1.5 rounded-full font-bold text-sm transition",
-                    timerDuration === d
-       ? "bg-gradient-primary text-primary-foreground glow-primary"
-                      : "glass text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {d} ثانية
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
+            {/* الفئات المختارة */}
+            {selectedCategories.length > 0 && (
+              <section ref={selectedRef} className="relative mb-8 group/section animate-fade-in">
+                <div className="absolute -inset-1 rounded-[1.8rem] blur-2xl opacity-20 bg-gradient-to-r from-primary to-amber-500" />
+                <div className="relative p-5 sm:p-6 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/15 shadow-2xl">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="h-1 w-8 rounded-full bg-gradient-to-r from-primary to-amber-500" />
+                    <h3 className="text-lg sm:text-xl font-bold whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-primary to-amber-500">
+                      الفئات المختارة
+                    </h3>
+                    <div className="flex-1 h-1 rounded-full bg-gradient-to-r from-primary to-amber-500 opacity-70" />
+                    <span className="text-sm text-white/60 font-bold">{selectedCategories.length}/6</span>
+                  </div>
 
-        <section className="space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-2xl font-bold">اختر <span className="text-gradient-gold">6 فئات</span></h2>
-            <div className={cn(
-              "px-4 py-1.5 rounded-full font-black text-sm transition",
-              selectedCategories.length === 6
- ? "bg-success/20 text-success ring-1 ring-success"
-                : "glass text-muted-foreground"
-            )}>
-              {selectedCategories.length} / 6
-            </div>
-          </div>
+                  <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4">
+                    {selectedCategories.map((catId) => {
+                      const cat = CATEGORY_GROUPS.flatMap(g => g.categories).find(c => c.id === catId);
+                      const count = counts?.[catId];
+                      if (!cat) return null;
 
-          <div className="space-y-6">
-            {CATEGORY_GROUPS.map((group) => (
-              <CategoryGroupSection key={group.title} group={group} counts={counts} />
-            ))}
-          </div>
-        </section>
-
-        <div className="sticky bottom-4 z-20 pt-2 animate-fade-in">
-          <Button
-            onClick={handleStart}
-            disabled={!canStart}
-            size="lg"
-            className={cn(
-              "w-full h-16 text-xl font-black rounded-2xl",
-              "bg-gradient-primary text-primary-foreground",
-              canStart? "glow-primary animate-pulse-glow hover:scale-[1.02]" : "opacity-50",
+                      return (
+                        <div key={catId} className="relative group/card">
+                          {count && (
+                            <div className="absolute -top-1.5 -left-1.5 z-20 bg-black/90 px-1.5 py-0.5 rounded-full border border-cyan-400/50 shadow-[0_0_3px_rgba(34,211,238,0.5)] pointer-events-none">
+                              <span className="text-[11px] leading-none font-normal text-cyan-300/90 tracking-wide">
+                                باقي {count.remaining} لعبة
+                              </span>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => useGameStore.getState().toggleCategory(catId)}
+                            className="absolute -top-2 -right-2 z-30 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full text-white text-sm font-bold flex items-center justify-center shadow-lg opacity-0 group-hover/card:opacity-100 transition-all hover:scale-110"
+                          >
+                            ×
+                          </button>
+                          <CategoryCard
+                            category={cat}
+                            selected={true}
+                            disabled={false}
+                            onClick={() => {}}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
             )}
-          >
-            {canStart? "ابدأ اللعبة 🚀" : `أكمل البيانات لتفعيل الزر`}
-          </Button>
-        </div>
+
+            {/* الفئات للاختيار - تختفي عند 6 */}
+            {selectedCategories.length < 6 && (
+              <section className="space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+  <h2 className="text-2xl font-bold">اختر <span className="text-gradient-gold">6 فئات</span></h2>
+  <div className="flex items-center gap-2">
+    <Button
+      onClick={() => {
+        const available = CATEGORY_GROUPS
+          .flatMap(g => g.categories)
+          .filter(c => (counts[c.id]?.remaining || 0) > 0)
+          .map(c => c.id);
+        
+        // shuffle
+        const shuffled = [...available].sort(() => Math.random() - 0.5);
+        const randomSix = shuffled.slice(0, 6);
+        
+        // فضي القديم وحط الجديد
+        useGameStore.setState({ selectedCategories: [] });
+        setTimeout(() => {
+          randomSix.forEach(id => useGameStore.getState().toggleCategory(id));
+        }, 0);
+        
+        toast.success("تم اختيار 6 فئات عشوائية ⚡");
+      }}
+      variant="outline"
+      size="sm"
+      className="glass hover:bg-primary/20 hover:border-primary gap-1.5 font-bold"
+      disabled={Object.keys(counts).length === 0}
+    >
+      <Sparkles className="w-4 h-4" />
+      لعبة سريعة
+    </Button>
+    <div className={cn(
+      "px-4 py-1.5 rounded-full font-black text-sm transition",
+      selectedCategories.length === 6
+      ? "bg-success/20 text-success ring-1 ring-success"
+        : "glass text-muted-foreground"
+    )}>
+      {selectedCategories.length} / 6
+    </div>
+  </div>
+</div>
+
+
+                <div className="space-y-6">
+                  {CATEGORY_GROUPS.map((group) => (
+                    <CategoryGroupSection key={group.title} group={group} counts={counts} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <div className="sticky bottom-4 z-20 pt-2 animate-fade-in">
+              <Button
+                onClick={handleStart}
+                disabled={!canStart}
+                size="lg"
+                className={cn(
+                  "w-full h-16 text-xl font-black rounded-2xl",
+                  "bg-gradient-primary text-primary-foreground",
+                  canStart? "glow-primary animate-pulse-glow hover:scale-[1.02]" : "opacity-50",
+                )}
+              >
+                {canStart? "التالي - اختيار الوسائل 🛠" : `أكمل البيانات لتفعيل الزر`}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <AidSelection onComplete={handleAidsComplete} />
+        )}
       </div>
 
-      {/* === مودال الاشتراك الجديد === */}
       <Dialog open={showSubModal} onOpenChange={setShowSubModal}>
         <DialogContent className="glass-strong max-w-sm" dir="rtl">
           <DialogHeader>
@@ -388,10 +461,10 @@ useEffect(() => {
               }
 
               const end = subInfo?.subscriptionEnd?.toDate
-             ? subInfo.subscriptionEnd.toDate()
+              ? subInfo.subscriptionEnd.toDate()
                 : subInfo?.subscriptionEnd?.seconds
-               ? new Date(subInfo.subscriptionEnd.seconds * 1000)
-                  : null;
+              ? new Date(subInfo.subscriptionEnd.seconds * 1000)
+                : null;
               const remaining = end? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000)) : 0;
               const isActive = subInfo?.isActive && remaining > 0;
 

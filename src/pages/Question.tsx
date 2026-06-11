@@ -20,11 +20,17 @@ export default function Question() {
   const swapActiveQuestion = useGameStore((s) => s.swapActiveQuestion);
   const useAid = useGameStore((s) => s.useAid);
   const currentTurn = useGameStore((s) => s.currentTurn);
+  const activeFreeze = useGameStore((s) => s.activeFreeze);
+  const activeTrap = useGameStore((s) => s.activeTrap);
+  const activePit = useGameStore((s) => s.activePit);
+  const shieldUnlocked = useGameStore((s) => s.shieldUnlocked);
 
   const [revealed, setRevealed] = useState(false);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
   const [knockoutWindow, setKnockoutWindow] = useState(true);
   const [question, setQuestion] = useState<QType | null>(null);
+  const [showKnockout, setShowKnockout] = useState(false);
+  const [pendingWinner, setPendingWinner] = useState<1|2>(1);
 
   const questionVideoRef = useRef<HTMLVideoElement>(null);
   const answerVideoRef = useRef<HTMLVideoElement>(null);
@@ -109,9 +115,10 @@ export default function Question() {
     if (w === 1 || w === 2) {
       sounds.correct!.currentTime = 0;
       sounds.correct?.play().catch(()=>{});
-      if (active.points === 600 && knockoutWindow) {
-        adjustScore(w, 600);
-        new Audio('/sounds/knockout.mp3').play().catch(()=>{});
+      if (active.points === 600 && w === currentTurn) {
+        setPendingWinner(w);
+        setShowKnockout(true);
+        return;
       }
     } else {
       sounds.none!.currentTime = 0;
@@ -121,13 +128,27 @@ export default function Question() {
     navigate("/board");
   };
 
+  const confirmKnockout = (isYes: boolean) => {
+    setShowKnockout(false);
+    if (isYes) {
+      adjustScore(pendingWinner, 600);
+      new Audio('/sounds/knockout.mp3').play().catch(()=>{});
+    }
+    awardPoints(pendingWinner);
+    navigate("/board");
+  };
+
+  const isTeam1Frozen = activeFreeze?.owner === 2;
+  const isTeam2Frozen = activeFreeze?.owner === 1;
+  const opponentShield = currentTurn === 1? team2.shieldActive : team1.shieldActive;
+
   return (
     <div className="min-h-screen p-3 sm:p-6 relative z-10 flex flex-col gap-4" dir="rtl">
       <TopBar showBackToBoard />
       <div className="flex flex-col lg:flex-row gap-5 flex-1 max-w-7xl mx-auto w-full">
         <div className="flex-1 relative group">
           <div className="absolute -inset-1 bg-gradient-to-b from-primary/20 via-transparent to-amber-500/20 rounded-3xl blur-2xl opacity-70"></div>
-          <div className="relative h-full bg-gradient-to-b from-white/[0.09] to-white/[0.03] glass rounded-3xl border border-white/15 overflow-hidden shadow-[0_25px_80px_-25px_rgba(0,0,0,0.8)]">
+          <div className="relative h-full bg-gradient-to-b from-white/[0.09] to-white/[0.03] glass rounded-3xl border-white/15 overflow-hidden shadow-[0_25px_80px_-25px_rgba(0,0,0,0.8)]">
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent"></div>
             <div className="p-6 md:p-8 flex flex-col h-full">
               <div className="flex items-center justify-between mb-6">
@@ -148,148 +169,140 @@ export default function Question() {
                 {active.points===600 && knockoutWindow && (
                   <div className="mb-3 text-red-400 font-black animate-pulse">⚡ الضربة القاضية - جاوب قبل 10 ثواني وخد 1200!</div>
                 )}
-<h2
-  className="text-xl md:text-2xl font-black leading-[1.6] text-white mb-6 max-w-3xl"
-  dangerouslySetInnerHTML={{ __html: question.question }}
-/>
-{!revealed && (
-  <>
-    {isDual? (
-      <div className="flex gap-4 justify-center mb-4">
-        {[qImages[0], aImages[0]].map((src, idx) => src && (
-          <div key={idx} className="group/img relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
-            {isVideo(src)? (
-              <video src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
-            ) : (
-              <button onClick={() => setZoomImg(src?? null)}>
-                <img src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
-              </button>
-            )}
-            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs font-black px-2 py-0.5 rounded-lg">{idx===0?'A':'B'}</div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <>
-        {qImages.length === 1 && (
-          <div className="group/img relative mb-4 inline-block">
-            <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
-            {isVideo(qImages[0])? (
-              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls />
-            ) : (
-              <button onClick={() => setZoomImg(qImages[0]?? null)}>
-                <img src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
-              </button>
-            )}
-          </div>
-        )}
-        {qImages.length > 1 && (
-          <div className="flex flex-wrap justify-center gap-4 mb-4 w-full max-w-4xl mx-auto">
-            {qImages.map((src, i) => {
-              const label = String.fromCharCode(65 + i);
-              return (
-                <div key={i} className="group/img relative aspect-square w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/0 to-emerald-500/0 group-hover/img:from-emerald-500/30 group-hover/img:to-green-500/30 rounded-2xl blur-xl transition duration-500"></div>
-                  <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/15 group-hover/img:border-emerald-400 transition">
-                    {isVideo(src)? (
-                      <video src={src} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                {activeFreeze && (
+                  <div className="mb-3 text-sky-400 font-black animate-pulse">❄ تم تجميد الخصم ❄</div>
+                )}
+                <h2 className="text-xl md:text-2xl font-black leading-[1.6] text-white mb-6 max-w-3xl" dangerouslySetInnerHTML={{ __html: question.question }} />
+                {!revealed && (
+                  <>
+                    {isDual? (
+                      <div className="flex gap-4 justify-center mb-4">
+                        {[qImages[0], aImages[0]].map((src, idx) => src && (
+                          <div key={idx} className="group/img relative">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
+                            {isVideo(src)? (
+                              <video src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                            ) : (
+                              <button onClick={() => setZoomImg(src?? null)}>
+                                <img src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+                              </button>
+                            )}
+                            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs font-black px-2 py-0.5 rounded-lg">{idx===0?'A':'B'}</div>
+                          </div>
+                        ))}
+                      </div>
                     ) : (
-                      <button onClick={() => setZoomImg(src)} className="w-full h-full block">
-                        <img src={src} alt={`img-${label}`} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} />
-                      </button>
+                      <>
+                        {qImages.length === 1 && (
+                          <div className="group/img relative mb-4 inline-block">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
+                            {isVideo(qImages[0])? (
+                              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls />
+                            ) : (
+                              <button onClick={() => setZoomImg(qImages[0]?? null)}>
+                                <img src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {qImages.length > 1 && (
+                          <div className="flex flex-wrap justify-center gap-4 mb-4 w-full max-w-4xl mx-auto">
+                            {qImages.map((src, i) => {
+                              const label = String.fromCharCode(65 + i);
+                              return (
+                                <div key={i} className="group/img relative aspect-square w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
+                                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/0 to-emerald-500/0 group-hover/img:from-emerald-500/30 group-hover/img:to-green-500/30 rounded-2xl blur-xl transition duration-500"></div>
+                                  <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/15 group-hover/img:border-emerald-400 transition">
+                                    {isVideo(src)? (
+                                      <video src={src} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                                    ) : (
+                                      <button onClick={() => setZoomImg(src)} className="w-full h-full block">
+                                        <img src={src} alt={`img-${label}`} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-black/90 text-white flex items-center justify-center text-base font-black border-2 border-emerald-400 group-hover/img:border-green-400 group-hover/img:shadow-[0_0_12px_rgba(16,185,129,0.8)] transition">
+                                    {label}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
-                  </div>
-                  <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-black/90 text-white flex items-center justify-center text-base font-black border-2 border-emerald-400 group-hover/img:border-green-400 group-hover/img:shadow-[0_0_12px_rgba(16,185,129,0.8)] transition">
-                    {label}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </>
-    )}
-  </>
-)}
+                  </>
+                )}
 
-{revealed && (
-  <div className="w-full max-w-2xl mt-4 animate-in fade-in slide-in-from-bottom-2 space-y-3">
-    <div className="relative overflow-hidden bg-gradient-to-b from-emerald-950/80 to-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 backdrop-blur-xl">
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-400 to-transparent"></div>
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-        </div>
-        <div className="text-right flex-1">
-  <div className="text-xs font-bold text-emerald-400 mb-1 tracking-wide">الإجابة الصحيحة</div>
-  <div
-    className="text-lg font-black text-white leading-snug"
-    dangerouslySetInnerHTML={{ __html: question.answer }}
-  />
-</div>
-      </div>
-    </div>
-
-    {(isDual? correctSrc : aImages.length>0) && (
-      <div className="w-full flex justify-center">
-        {aImages.length <= 1 &&!isDual? (
-          <div className="inline-block rounded-2xl border border-emerald-500/30 p-0.5 bg-black/20">
-            {isVideo(aImages[0])? (
-              <video ref={answerVideoRef} key={question.id + "-ans"} src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" autoPlay loop playsInline controls />
-            ) : (
-              <button onClick={() => setZoomImg(aImages[0]?? null)}>
-                <img src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" alt="صورة الإجابة" />
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-wrap justify-center gap-4 w-full">
-            {(isDual? [correctSrc!] : aImages).map((src, i) => {
-              const label = String.fromCharCode(65 + i);
-              return (
-                <div key={i} className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
-                  <div className="w-full h-full rounded-2xl border border-emerald-500/40 overflow-hidden">
-                    {isVideo(src)? (
-                      <video src={src} className="w-full h-full object-fill" autoPlay loop playsInline controls />
-                    ) : (
-                      <button onClick={() => setZoomImg(src)} className="w-full h-full block">
-                        <img src={src} className="w-full h-full object-fill" alt="صورة الإجابة" />
-                      </button>
-                    )}
-                  </div>
-                  {!isDual && aImages.length > 1 && (
-                    <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-black/80 text-white flex items-center justify-center text-sm font-bold border border-emerald-400">
-                      {label}
+                {revealed && (
+                  <div className="w-full max-w-2xl mt-4 animate-in fade-in slide-in-from-bottom-2 space-y-3">
+                    <div className="relative overflow-hidden bg-gradient-to-b from-emerald-950/80 to-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 backdrop-blur-xl">
+                      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-400 to-transparent"></div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                        <div className="text-right flex-1">
+                          <div className="text-xs font-bold text-emerald-400 mb-1 tracking-wide">الإجابة الصحيحة</div>
+                          <div className="text-lg font-black text-white leading-snug" dangerouslySetInnerHTML={{ __html: question.answer }} />
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-)}
+                    {(isDual? correctSrc : aImages.length>0) && (
+                      <div className="w-full flex justify-center">
+                        {aImages.length <= 1 &&!isDual? (
+                          <div className="inline-block rounded-2xl border border-emerald-500/30 p-0.5 bg-black/20">
+                            {isVideo(aImages[0])? (
+                              <video ref={answerVideoRef} key={question.id + "-ans"} src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" autoPlay loop playsInline controls />
+                            ) : (
+                              <button onClick={() => setZoomImg(aImages[0]?? null)}>
+                                <img src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" alt="صورة الإجابة" />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap justify-center gap-4 w-full">
+                            {(isDual? [correctSrc!] : aImages).map((src, i) => {
+                              const label = String.fromCharCode(65 + i);
+                              return (
+                                <div key={i} className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
+                                  <div className="w-full h-full rounded-2xl border border-emerald-500/40 overflow-hidden">
+                                    {isVideo(src)? (
+                                      <video src={src} className="w-full h-full object-fill" autoPlay loop playsInline controls />
+                                    ) : (
+                                      <button onClick={() => setZoomImg(src)} className="w-full h-full block">
+                                        <img src={src} className="w-full h-full object-fill" alt="صورة الإجابة" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {!isDual && aImages.length > 1 && (
+                                    <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-black/80 text-white flex items-center justify-center text-sm font-bold border border-emerald-400">{label}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="mt-8">
                 <div className="text-center text-white/60 font-bold mb-3">من جاوب على السؤال؟</div>
                 <div className="grid grid-cols-3 gap-3">
-                  <button onClick={() => handleWinner(1)} className="relative group h-16 rounded-2xl bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 border border-blue-400/30 shadow-[0_10px_30px_-10px_rgba(59,130,246,0.5)] transition-all hover:scale-[1.02]">
+                  <button disabled={isTeam1Frozen} onClick={() => handleWinner(1)} className="relative group h-16 rounded-2xl bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 border border-blue-400/30 shadow-[0_10px_30px_-10px_rgba(59,130,246,0.5)] transition-all hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 rounded-2xl transition" />
-                    <div className="relative flex flex-col items-center justify-center h-full">
-                      <span className="text-2xl font-black text-white">A</span>
-                      <span className="text-xs text-white/80 -mt-1">{team1.name || "فريق 1"}</span>
+                    <div className="relative flex items-center justify-center h-full px-2">
+                      <span className="text-xl font-black text-white truncate">{team1.name || "فريق 1"}{isTeam1Frozen && ' ❄'}</span>
                     </div>
                   </button>
                   <button onClick={() => handleWinner(0)} className="h-16 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 font-bold transition">لا أحد</button>
-                  <button onClick={() => handleWinner(2)} className="relative group h-16 rounded-2xl bg-gradient-to-b from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 border border-pink-400/30 shadow-[0_10px_30px_-10px_rgba(236,72,153,0.5)] transition-all hover:scale-[1.02]">
+                  <button disabled={isTeam2Frozen} onClick={() => handleWinner(2)} className="relative group h-16 rounded-2xl bg-gradient-to-b from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 border border-pink-400/30 shadow-[0_10px_30px_-10px_rgba(236,72,153,0.5)] transition-all hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
                     <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 rounded-2xl transition" />
-                    <div className="relative flex flex-col items-center justify-center h-full">
-                      <span className="text-2xl font-black text-white">B</span>
-                      <span className="text-xs text-white/80 -mt-1">{team2.name || "فريق 2"}</span>
+                    <div className="relative flex items-center justify-center h-full px-2">
+                      <span className="text-xl font-black text-white truncate">{team2.name || "فريق 2"}{isTeam2Frozen && ' ❄'}</span>
                     </div>
                   </button>
                 </div>
@@ -299,16 +312,37 @@ export default function Question() {
         </div>
 
         <aside className="lg:w-72 flex flex-col gap-3">
-          <div className="bg-white/[0.05] glass rounded-2xl p-4 border border-white/10">
+          <div className="bg-white/[0.05] glass rounded-2xl p-4 border-white/10">
             <h4 className="font-bold mb-3 text-center text-sm text-white/60">وسائل المساعدة</h4>
-            <div className="grid grid-cols-2 gap-2">
-              {(['swap','pit','twoAnswers','trap'] as const).map((aid,i)=>(
-                <button key={aid} disabled={!(currentTurn===1?team1:team2).aids[aid] || aid==='pit'} onClick={()=>{useAid(currentTurn,aid); if(aid==='swap')swapActiveQuestion();}} className="flex-col h-auto py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl disabled:opacity-40">
-                  <span className="text-2xl">{['🔄','🕳️','✌️','🪤'][i]}</span>
-                  <span className="text-xs mt-1 block">{['تبديل','حفرة','إجابتين','فخ'][i]}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-3 gap-2">
+              {(() => {
+                const currentTeam = currentTurn === 1? team1 : team2;
+                const aids = (currentTeam.selectedAids || []) as import("@/store/gameStore").AidType[];
+                const icons: Record<string, string> = { swap: '🔄', pit: '🕳', twoAnswers: '✌', trap: '🪤', freeze: '❄', shield: '🛡' };
+                const labels: Record<string, string> = { swap: 'تبديل', pit: 'حفرة', twoAnswers: 'إجابتين', trap: 'فخ', freeze: 'تجميد', shield: 'درع' };
+                return aids.map((aid) => {
+                  const isDisabled =!currentTeam.aids[aid]
+                    || aid==='pit'
+                    || aid==='shield'
+                    || ((aid==='trap' || aid==='freeze') && opponentShield)
+                    || currentTeam.usedAidThisTurn
+                    || (aid==='trap' && activeFreeze?.owner === currentTurn)
+                    || (aid==='freeze' && activeTrap?.owner === currentTurn);
+                  return (
+                    <button
+                      key={aid}
+                      disabled={isDisabled}
+                      onClick={() => { useAid(currentTurn, aid); if (aid === 'swap') swapActiveQuestion(); }}
+                      className="flex-col h-auto py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl disabled:opacity-40"
+                    >
+                      <span className="text-xl">{icons[aid]}</span>
+                      <span className="text-[10px] mt-1 block">{labels[aid]}</span>
+                    </button>
+                  );
+                });
+              })()}
             </div>
+            {opponentShield && <div className="text-xs text-violet-400 text-center mt-2">الخصم مفعل درع 🛡</div>}
           </div>
           <TeamScoreBar team={1} />
           <TeamScoreBar team={2} />
@@ -322,6 +356,25 @@ export default function Question() {
           ) : (
             <img src={zoomImg} className={`max-w-full max-h-full object-contain rounded-2xl ${isColorQuestion && qImages.includes(zoomImg)? 'grayscale' : ''}`} />
           )}
+        </div>
+      )}
+
+      {showKnockout && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4" dir="rtl">
+          <div className="relative w-full max-w-md">
+            <div className="absolute -inset-1 bg-gradient-to-r from-red-500/50 to-amber-500/50 rounded-3xl blur-2xl"></div>
+            <div className="relative glass-strong rounded-3xl border border-red-500/30 p-8 text-center">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-b from-red-500 to-red-700 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.5)] animate-pulse">
+                <span className="text-4xl">⚡</span>
+              </div>
+              <h3 className="text-2xl font-black text-white mb-2">الضربة القاضية</h3>
+              <p className="text-white/70 mb-6">صاحب الدور <span className="text-primary font-bold">{pendingWinner===1?team1.name:team2.name}</span> جاوب صح في أول 10 ثواني؟</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={()=>confirmKnockout(true)} className="h-14 rounded-2xl bg-gradient-primary text-black font-black text-lg hover:opacity-90 transition shadow-[0_10px_30px_-10px_rgba(16,185,129,0.5)]">نعم - 1200</button>
+                <button onClick={()=>confirmKnockout(false)} className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/20 text-white font-bold text-lg transition">لا - 600</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

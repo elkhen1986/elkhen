@@ -1,6 +1,6 @@
 import { useGameStore, type AidType } from "@/store/gameStore";
 import { cn } from "@/lib/utils";
-import { Repeat, Bomb, Hand, Bug, Minus, Plus } from "lucide-react";
+import { Repeat, Bomb, Hand, Bug, Minus, Plus, Snowflake, Shield } from "lucide-react";
 
 interface Props {
   team: 1 | 2;
@@ -11,51 +11,69 @@ const AIDS: { key: AidType; icon: typeof Repeat; label: string }[] = [
   { key: "pit", icon: Bomb, label: "حفرة" },
   { key: "twoAnswers", icon: Hand, label: "إجابتين" },
   { key: "trap", icon: Bug, label: "فخ" },
+  { key: "freeze", icon: Snowflake, label: "تجميد" },
+  { key: "shield", icon: Shield, label: "درع" },
 ];
 
 export function TeamScoreBar({ team }: Props) {
   const teamData = useGameStore((s) => (team === 1? s.team1 : s.team2));
+  const opponentData = useGameStore((s) => (team === 1? s.team2 : s.team1));
   const currentTurn = useGameStore((s) => s.currentTurn);
   const adjustScore = useGameStore((s) => s.adjustScore);
   const useAid = useGameStore((s) => s.useAid);
   const cancelPit = useGameStore((s) => s.cancelPit);
   const activePit = useGameStore((s) => s.activePit);
   const activeTrap = useGameStore((s) => s.activeTrap);
+  const activeFreeze = useGameStore((s) => s.activeFreeze);
   const active = useGameStore((s) => s.active);
+  const shieldUnlocked = useGameStore((s) => s.shieldUnlocked);
   const isTurn = currentTurn === team;
   const isBoard =!active;
   const isPitActive = activePit?.owner === team;
   const isTrapTarget = activeTrap && activeTrap.owner!== team;
   const isPitOwner = activePit?.owner === team;
   const isPitVictim = activePit && activePit.owner!== team;
+  const isFreezeActive = activeFreeze?.owner === team;
+  const hasShield = teamData.shieldActive;
+  const opponentHasShield = opponentData.shieldActive;
+  const isFrozen =!!activeFreeze && activeFreeze.owner!== team;
+  const selectedAids = teamData.selectedAids || [];
 
   return (
     <div
       className={cn(
-        "glass-strong rounded-2xl p-3 sm:p-4 flex items-center gap-3 transition-all",
+        "relative glass-strong rounded-2xl p-3 sm:p-4 flex items-center gap-3 transition-all",
         isTurn && "ring-2 ring-primary glow-primary",
         isTrapTarget && "ring-2 ring-red-500 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.5)]",
         isPitOwner && "ring-2 ring-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)]",
         isPitVictim && "ring-2 ring-red-500/70 shadow-[0_0_15px_rgba(239,68,68,0.4)]",
+        hasShield && "ring-2 ring-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.5)]",
+        isFreezeActive && "ring-2 ring-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.5)]",
+        isFrozen && "ring-2 ring-white/70 opacity-60 grayscale",
       )}
     >
-      <div className="flex-1 min-w-0">
+      {isFrozen && (
+        <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_10px,rgba(255,255,255,0.12)_10px,rgba(255,255,255,0.12)_14px)]" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0 relative z-10">
         <div className="flex items-center gap-2 mb-1 min-w-0">
           <span className={cn(
-            "text-xs font-bold px-2 py-0.5 rounded-full shrink-0",
+            "text-xs font-bold px-2 py-0.5 rounded-full shrink-0 truncate max-w-[120px]",
             isTurn? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
           )}>
-            فريق {team}
-          </span>
-          <h3 className="font-bold whitespace-nowrap overflow-hidden leading-tight text-[clamp(0.7rem,3.5vw,1rem)]">
             {teamData.name || `الفريق ${team}`}
-          </h3>
+          </span>
+          {hasShield && <Shield className="w-3.5 h-3.5 text-violet-400 animate-pulse" />}
+          {isFreezeActive && <Snowflake className="w-3.5 h-3.5 text-sky-400 animate-pulse" />}
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => adjustScore(team, -100)}
-            className="w-7 h-7 rounded-full bg-destructive/20 hover:bg-destructive/40 text-destructive flex items-center justify-center transition shrink-0"
+            disabled={isFrozen}
+            className="w-7 h-7 rounded-full bg-destructive/20 hover:bg-destructive/40 text-destructive flex items-center justify-center transition shrink-0 disabled:opacity-30"
             aria-label="إنقاص"
           >
             <Minus className="w-4 h-4" />
@@ -67,7 +85,8 @@ export function TeamScoreBar({ team }: Props) {
 
           <button
             onClick={() => adjustScore(team, 100)}
-            className="w-7 h-7 rounded-full bg-success/20 hover:bg-success/40 text-success flex items-center justify-center transition shrink-0"
+            disabled={isFrozen}
+            className="w-7 h-7 rounded-full bg-success/20 hover:bg-success/40 text-success flex items-center justify-center transition shrink-0 disabled:opacity-30"
             aria-label="زيادة"
           >
             <Plus className="w-4 h-4" />
@@ -75,14 +94,20 @@ export function TeamScoreBar({ team }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-1 shrink-0">
+      <div className="flex flex-col items-center gap-1 shrink-0 relative z-10">
         <span className="text- text-muted-foreground font-semibold whitespace-nowrap leading-none">
           وسائل المساعدة
         </span>
         <div className="flex gap-1.5">
-          {AIDS.map(({ key, icon: Icon, label }) => {
+          {AIDS.filter(({key}) => selectedAids.includes(key)).map(({ key, icon: Icon, label }) => {
             const available = teamData.aids[key];
             const isPit = key === "pit";
+            const isShield = key === "shield";
+            const isFreeze = key === "freeze";
+            const blockedByShield = (key === "trap" || key === "freeze") && opponentHasShield;
+            const usedOnce = teamData.usedAidThisTurn;
+
+            if (!available &&!isPitActive && key!== "pit") {}
 
             if (isPit && isTurn && isBoard) {
               return (
@@ -90,9 +115,10 @@ export function TeamScoreBar({ team }: Props) {
                   key={key}
                   title={isPitActive? "إلغاء الحفرة" : "تفعيل الحفرة"}
                   onClick={() => isPitActive? cancelPit(team) : useAid(team, 'pit')}
+                  disabled={(!available &&!isPitActive) || isFrozen || usedOnce}
                   className={cn(
                     "w-7 h-7 rounded-full glass flex items-center justify-center transition",
-                    isPitActive? "text-red-400 ring-1 ring-red-400 animate-pulse" : available? "text-primary hover:bg-primary/20" : "opacity-30 grayscale",
+                    isPitActive? "text-red-400 ring-1 ring-red-400 animate-pulse" : available &&!usedOnce? "text-primary hover:bg-primary/20" : "opacity-30 grayscale cursor-not-allowed",
                   )}
                 >
                   <Icon className="w-4 h-4" />
@@ -100,18 +126,29 @@ export function TeamScoreBar({ team }: Props) {
               );
             }
 
+            const canUse = isShield
+            ? (!isTurn &&!!active && available && shieldUnlocked &&!usedOnce)
+              : isFreeze
+            ? (isTurn &&!!active && available &&!usedOnce)
+              : (key === 'swap' || key === 'twoAnswers' || key === 'trap')
+            ? (isTurn &&!!active && available &&!usedOnce)
+              : false;
+
             return (
-              <div
+              <button
                 key={key}
-                title={label}
+                title={!shieldUnlocked && isShield? "الدرع بعد 10 ثواني" : blockedByShield? "الخصم مفعل درع" : usedOnce? "وسيلة واحدة في الدور" : label}
+                onClick={() => available &&!blockedByShield && canUse && useAid(team, key)}
+                disabled={!available || blockedByShield ||!canUse || isFrozen}
                 className={cn(
-                  "w-7 h-7 rounded-full glass flex items-center justify-center",
-                  available? "text-primary" : "opacity-30 grayscale",
-                  isPit && isPitActive && "text-red-400 ring-1 ring-red-400",
+                  "w-7 h-7 rounded-full glass flex items-center justify-center transition",
+                  available &&!blockedByShield && canUse &&!isFrozen? "text-primary hover:bg-primary/20 cursor-pointer" : "opacity-30 grayscale cursor-not-allowed",
+                  isShield && hasShield && "text-violet-400 ring-1 ring-violet-400",
+                  isFreeze && isFreezeActive && "text-sky-400 ring-1 ring-sky-400",
                 )}
               >
                 <Icon className="w-4 h-4" />
-              </div>
+              </button>
             );
           })}
         </div>
