@@ -1,6 +1,7 @@
 import { useGameStore, type AidType } from "@/store/gameStore";
 import { cn } from "@/lib/utils";
 import { Repeat, Bomb, Hand, Bug, Minus, Plus, Snowflake, Shield } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface Props {
   team: 1 | 2;
@@ -27,6 +28,9 @@ export function TeamScoreBar({ team }: Props) {
   const activeFreeze = useGameStore((s) => s.activeFreeze);
   const active = useGameStore((s) => s.active);
   const shieldUnlocked = useGameStore((s) => s.shieldUnlocked);
+
+  const [shieldTimer, setShieldTimer] = useState(0);
+
   const isTurn = currentTurn === team;
   const isBoard =!active;
   const isPitActive = activePit?.owner === team;
@@ -38,6 +42,28 @@ export function TeamScoreBar({ team }: Props) {
   const opponentHasShield = opponentData.shieldActive;
   const isFrozen =!!activeFreeze && activeFreeze.owner!== team;
   const selectedAids = teamData.selectedAids || [];
+
+  const isOpponent =!isTurn;
+  const showShieldTimer = isOpponent && active && teamData.aids.shield &&!shieldUnlocked;
+
+  // تايمر الدرع للخصم
+  useEffect(() => {
+    if (showShieldTimer) {
+      setShieldTimer(10);
+      const interval = setInterval(() => {
+        setShieldTimer((t) => {
+          if (t <= 1 || shieldUnlocked) {
+            clearInterval(interval);
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setShieldTimer(0);
+    }
+  }, [active?.questionId, showShieldTimer, shieldUnlocked]);
 
   return (
     <div
@@ -60,7 +86,7 @@ export function TeamScoreBar({ team }: Props) {
       <div className="flex-1 min-w-0 relative z-10">
         <div className="flex items-center gap-2 mb-1 min-w-0">
           <span className={cn(
-            "text-xs font-bold px-2 py-0.5 rounded-full shrink-0 truncate max-w-[120px]",
+            "text-xs font-bold px-2 py-0.5 rounded-full shrink-0 truncate max-w-",
             isTurn? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
           )}>
             {teamData.name || `الفريق ${team}`}
@@ -117,7 +143,7 @@ export function TeamScoreBar({ team }: Props) {
                   onClick={() => isPitActive? cancelPit(team) : useAid(team, 'pit')}
                   disabled={(!available &&!isPitActive) || isFrozen || usedOnce}
                   className={cn(
-                    "w-7 h-7 rounded-full glass flex items-center justify-center transition",
+                    "w-7 h-7 rounded-full glass flex items-center justify-center transition relative",
                     isPitActive? "text-red-400 ring-1 ring-red-400 animate-pulse" : available &&!usedOnce? "text-primary hover:bg-primary/20" : "opacity-30 grayscale cursor-not-allowed",
                   )}
                 >
@@ -127,12 +153,14 @@ export function TeamScoreBar({ team }: Props) {
             }
 
             const canUse = isShield
-            ? (!isTurn &&!!active && available && shieldUnlocked &&!usedOnce)
+          ? (!isTurn &&!!active && available && shieldUnlocked &&!usedOnce)
               : isFreeze
-            ? (isTurn &&!!active && available &&!usedOnce)
+          ? (isTurn &&!!active && available &&!usedOnce)
               : (key === 'swap' || key === 'twoAnswers' || key === 'trap')
-            ? (isTurn &&!!active && available &&!usedOnce)
+          ? (isTurn &&!!active && available &&!usedOnce)
               : false;
+
+            const isShieldTimerActive = isShield && showShieldTimer && shieldTimer > 0;
 
             return (
               <button
@@ -141,13 +169,48 @@ export function TeamScoreBar({ team }: Props) {
                 onClick={() => available &&!blockedByShield && canUse && useAid(team, key)}
                 disabled={!available || blockedByShield ||!canUse || isFrozen}
                 className={cn(
-                  "w-7 h-7 rounded-full glass flex items-center justify-center transition",
-                  available &&!blockedByShield && canUse &&!isFrozen? "text-primary hover:bg-primary/20 cursor-pointer" : "opacity-30 grayscale cursor-not-allowed",
+                  "w-7 h-7 rounded-full glass flex items-center justify-center transition relative",
+                  available &&!blockedByShield && canUse &&!isFrozen? "text-primary hover:bg-primary/20 cursor-pointer" : isShieldTimerActive? "" : "opacity-30 grayscale cursor-not-allowed",
                   isShield && hasShield && "text-violet-400 ring-1 ring-violet-400",
                   isFreeze && isFreezeActive && "text-sky-400 ring-1 ring-sky-400",
                 )}
+                style={{ overflow: 'visible' }}
               >
                 <Icon className="w-4 h-4" />
+
+                {/* تايمر الدرع للخصم - أحمر متوهج */}
+                {isShieldTimerActive && (
+                  <div
+                    className="absolute animate-pulse"
+                    style={{
+                      top: '-8px',
+                      right: '-8px',
+                      width: '22px',
+                      height: '22px',
+                      backgroundColor: 'rgba(153, 27, 0.95)',
+                      borderRadius: '50%',
+                      border: '2px solid #ef4444',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 12px #ef4444, 0 0 24px rgba(239, 68, 68, 0.8), 0 0 36px rgba(220, 38, 38, 0.6)',
+                      backdropFilter: 'blur(2px)',
+                      zIndex: 50,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: '900',
+                        color: '#fecaca',
+                        lineHeight: '1',
+                        textShadow: '0 0 6px #ef4444, 0 0 12px #dc2626',
+                      }}
+                    >
+                      {shieldTimer}
+                    </span>
+                  </div>
+                )}
               </button>
             );
           })}

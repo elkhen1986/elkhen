@@ -47,7 +47,7 @@ export async function preloadFirebaseCategories(selected?: CategoryId[]) {
 }
 
 export type Points = 200 | 400 | 600;
-export type AidType = "swap" | "pit" | "twoAnswers" | "trap" | "freeze" | "shield";
+export type AidType = "swap" | "pit" | "twoAnswers" | "trap" | "freeze" | "shield" | "streak";
 
 export interface TeamState {
   name: string;
@@ -70,7 +70,7 @@ interface GameState {
   team2: TeamState;
   selectedCategories: CategoryId[];
   currentTurn: 1 | 2;
-  timerDuration: number; // ← غيرناها من 30|60|90 لـ number
+  timerDuration: number;
   usedSlots: Record<string, true>;
   active: ActiveQuestion | null;
   questionQueues: Record<string, string[]>;
@@ -78,13 +78,16 @@ interface GameState {
   activeTrap: { owner: 1 | 2 } | null;
   activeFreeze: { owner: 1 | 2 } | null;
   shieldUnlocked: boolean;
+  activeStreaks: { team1: { savedPoints: number } | null; team2: { savedPoints: number } | null };
+  lastCorrectAnswer: { team: 1 | 2; points: number } | null;
+  pendingAnswer: { team: 1 | 2; points: number } | null;
 
   theme: 'default' | 'pharaonic' | 'ramadan' | 'eid' | 'worldcup' | 'neon' | 'winter';
   setTheme: (t: GameState['theme']) => void;
 
   setTeamName: (n: 1 | 2, name: string) => void;
   toggleCategory: (id: CategoryId) => void;
-  setTimerDuration: (d: number) => void; // ← خليناها number بس مش هنستخدمها من UI
+  setTimerDuration: (d: number) => void;
   setTeamAids: (team: 1 | 2, aids: AidType[]) => void;
   startGame: () => void;
   pickQuestion: (categoryId: CategoryId, points: Points, side: "left" | "right") => Promise<boolean>;
@@ -102,7 +105,7 @@ interface GameState {
 const freshTeam = (name = ""): TeamState => ({
   name,
   score: 0,
-  aids: { swap: false, pit: false, twoAnswers: false, trap: false, freeze: false, shield: false },
+  aids: { swap: false, pit: false, twoAnswers: false, trap: false, freeze: false, shield: false, streak: true },
   shieldActive: false,
   selectedAids: [],
   usedAidThisTurn: false,
@@ -128,7 +131,7 @@ export const useGameStore = create<GameState>()(
       team2: freshTeam(),
       selectedCategories: [],
       currentTurn: 1,
-      timerDuration: 30, // ← default
+      timerDuration: 30,
       usedSlots: {},
       active: null,
       questionQueues: {},
@@ -136,6 +139,9 @@ export const useGameStore = create<GameState>()(
       activeTrap: null,
       activeFreeze: null,
       shieldUnlocked: false,
+      activeStreaks: { team1: null, team2: null },
+      lastCorrectAnswer: null,
+      pendingAnswer: null,
 
       theme: 'default',
       setTheme: (t) => set({ theme: t }),
@@ -157,7 +163,7 @@ export const useGameStore = create<GameState>()(
       setTeamAids: (team, aids) =>
         set((s) => {
           const t = team === 1? s.team1 : s.team2;
-          const newAids: Record<AidType, boolean> = { swap: false, pit: false, twoAnswers: false, trap: false, freeze: false, shield: false };
+          const newAids: Record<AidType, boolean> = { swap: false, pit: false, twoAnswers: false, trap: false, freeze: false, shield: false, streak: true };
           const chosen = aids.slice(0,3) as AidType[];
           chosen.forEach(a => newAids[a] = true);
           return { [team === 1? "team1" : "team2"]: {...t, aids: newAids, selectedAids: chosen, usedAidThisTurn: false } } as Partial<GameState>;
@@ -168,6 +174,7 @@ export const useGameStore = create<GameState>()(
           const reset = (t: TeamState) => {
             const na = {...t.aids};
             t.selectedAids.forEach(a => na[a] = true);
+            na.streak = true;
             return {...t, score: 0, shieldActive: false, aids: na, usedAidThisTurn: false };
           };
           return {
@@ -180,6 +187,9 @@ export const useGameStore = create<GameState>()(
             activeTrap: null,
             activeFreeze: null,
             shieldUnlocked: false,
+            activeStreaks: { team1: null, team2: null },
+            lastCorrectAnswer: null,
+            pendingAnswer: null,
           };
         }),
 
@@ -194,17 +204,15 @@ export const useGameStore = create<GameState>()(
 
         const qid = String((q as any).id || Date.now() + Math.random());
 
-        // ← النظام الجديد: الوقت حسب النقاط
         const duration = points === 200? 30 : points === 400? 50 : 70;
 
         set((s) => ({
           active: { categoryId, points, side, questionId: qid },
           usedSlots: {...s.usedSlots, [key]: true },
           shieldUnlocked: false,
-          timerDuration: duration, // ← هنا بنحدد الوقت أوتوماتيك
+          timerDuration: duration,
         }));
 
-        // فتح الدرع بعد 10 ثواني
         setTimeout(() => {
           if (get().active?.questionId === qid) set({ shieldUnlocked: true });
         }, 10000);
@@ -225,6 +233,76 @@ export const useGameStore = create<GameState>()(
       awardPoints: (winner) => {
         const { active, currentTurn, activePit, activeTrap, activeFreeze } = get();
         if (!active) return;
+
+        let t1 = {...get().team1};
+        let t2 = {...get().team2};
+        let newStreaks = {...get().activeStreaks};
+        let newLastCorrect = get().lastCorrectAnswer;
+
+        const myStreak = currentTurn === 1? newStreaks.team1 : newStreaks.team2;
+
+        // لو الستريك متفعل عند صاحب الدور
+        if (myStreak) {
+          if (winner === currentTurn) {
+            if (myStreak.savedPoints === 0) {
+              // أول مرة - خزن النقط بس (متضيفش حاجة)
+              if (currentTurn === 1) newStreaks.team1 = { savedPoints: active.points };
+              else newStreaks.team2 = { savedPoints: active.points };
+            } else {
+              // تاني مرة - ضيف اللي خزنته + دبل السؤال التاني بس
+              const total = myStreak.savedPoints + (active.points * 2);
+              if (currentTurn === 1) {
+                t1.score += total;
+                newStreaks.team1 = null;
+              } else {
+                t2.score += total;
+                newStreaks.team2 = null;
+              }
+            }
+            newLastCorrect = null;
+          } else {
+            // غلط أو لا أحد - اخسر اللي خزنته بس
+            if (currentTurn === 1) {
+              t1.score -= myStreak.savedPoints;
+              newStreaks.team1 = null;
+            } else {
+              t2.score -= myStreak.savedPoints;
+              newStreaks.team2 = null;
+            }
+            newLastCorrect = null;
+            // لو حد تاني جاوب، اديه نقطته عادي
+            if (winner === 1) t1.score += active.points;
+            if (winner === 2) t2.score += active.points;
+          }
+        } else {
+          // مفيش ستريك - عادي
+          if (winner === 1) t1.score += active.points;
+          else if (winner === 2) t2.score += active.points;
+
+          if (winner === 1 || winner === 2) {
+            newLastCorrect = { team: winner, points: active.points };
+          } else {
+            newLastCorrect = null;
+          }
+        }
+
+        if (activePit && winner === activePit.owner) {
+          const opponent = activePit.owner === 1? 2 : 1;
+          if (opponent === 1) t1.score -= active.points;
+          else t2.score -= active.points;
+        }
+
+        if (activeTrap && winner === 0) {
+          const forced = activeTrap.owner === 1? 2 : 1;
+          if (forced === 1) t1.score -= active.points;
+          else t2.score -= active.points;
+        }
+
+        if (activeFreeze && winner!== 0 && winner!== activeFreeze.owner) {
+          if (winner === 1) t1.score -= active.points;
+          if (winner === 2) t2.score -= active.points;
+        }
+
         const updates: Partial<GameState> = {
           usedSlots: {...get().usedSlots, [slotKey(active.categoryId, active.points, active.side)]: true },
           active: null,
@@ -233,39 +311,12 @@ export const useGameStore = create<GameState>()(
           activeTrap: null,
           activeFreeze: null,
           shieldUnlocked: false,
+          activeStreaks: newStreaks,
+          lastCorrectAnswer: newLastCorrect,
+          pendingAnswer: null,
+          team1: {...t1, shieldActive: false, usedAidThisTurn: false },
+          team2: {...t2, shieldActive: false, usedAidThisTurn: false },
         };
-        if (winner === 1) updates.team1 = {...get().team1, score: get().team1.score + active.points, usedAidThisTurn: false };
-        else if (winner === 2) updates.team2 = {...get().team2, score: get().team2.score + active.points, usedAidThisTurn: false };
-
-        if (activePit && winner === activePit.owner) {
-          const opponent = activePit.owner === 1? 2 : 1;
-          if (opponent === 1) {
-            const base = updates.team1?.score?? get().team1.score;
-            updates.team1 = {...(updates.team1?? get().team1), score: base - active.points, usedAidThisTurn: false };
-          } else {
-            const base = updates.team2?.score?? get().team2.score;
-            updates.team2 = {...(updates.team2?? get().team2), score: base - active.points, usedAidThisTurn: false };
-          }
-        }
-
-        if (activeTrap && winner === 0) {
-          const forced = activeTrap.owner === 1? 2 : 1;
-          if (forced === 1) {
-            const base = updates.team1?.score?? get().team1.score;
-            updates.team1 = {...(updates.team1?? get().team1), score: base - active.points, usedAidThisTurn: false };
-          } else {
-            const base = updates.team2?.score?? get().team2.score;
-            updates.team2 = {...(updates.team2?? get().team2), score: base - active.points, usedAidThisTurn: false };
-          }
-        }
-
-        if (activeFreeze && winner!== 0 && winner!== activeFreeze.owner) {
-          if (winner === 1) updates.team1 = {...(updates.team1?? get().team1), score: (updates.team1?.score?? get().team1.score) - active.points, usedAidThisTurn: false };
-          if (winner === 2) updates.team2 = {...(updates.team2?? get().team2), score: (updates.team2?.score?? get().team2.score) - active.points, usedAidThisTurn: false };
-        }
-
-        updates.team1 = {...(updates.team1?? get().team1), shieldActive: false, usedAidThisTurn: false };
-        updates.team2 = {...(updates.team2?? get().team2), shieldActive: false, usedAidThisTurn: false };
 
         set(updates as GameState);
       },
@@ -274,8 +325,21 @@ export const useGameStore = create<GameState>()(
         set((s) => {
           const t = team === 1? s.team1 : s.team2;
           if (!t.aids[aid]) return {};
-          if (t.usedAidThisTurn) return {};
+          if (t.usedAidThisTurn && aid!== "streak") return {};
           const opponent = team === 1? s.team2 : s.team1;
+
+          if (aid === "streak") {
+            // تفعيل الستريك - كل فريق مستقل
+            const streaks = s.activeStreaks;
+            if (team === 1 && streaks.team1) return {};
+            if (team === 2 && streaks.team2) return {};
+            const newAids = {...t.aids, streak: false };
+            const newStreaks = {...streaks, [team === 1? 'team1' : 'team2']: { savedPoints: 0 } };
+            return {
+              activeStreaks: newStreaks,
+              [team === 1? "team1" : "team2"]: {...t, aids: newAids, usedAidThisTurn: false }
+            } as Partial<GameState>;
+          }
 
           if ((aid === "trap" || aid === "freeze") && opponent.shieldActive) {
             const oppUpdate = team === 1? { team2: {...opponent, shieldActive: false } } : { team1: {...opponent, shieldActive: false } };
@@ -328,6 +392,7 @@ export const useGameStore = create<GameState>()(
           const reset = (t: TeamState) => {
             const na = {...t.aids};
             t.selectedAids.forEach(a => na[a] = true);
+            na.streak = true;
             return {...t, score: 0, shieldActive: false, aids: na, usedAidThisTurn: false };
           };
           return {
@@ -338,6 +403,9 @@ export const useGameStore = create<GameState>()(
             activeTrap: null,
             activeFreeze: null,
             shieldUnlocked: false,
+            activeStreaks: { team1: null, team2: null },
+            lastCorrectAnswer: null,
+            pendingAnswer: null,
             team1: reset(s.team1),
             team2: reset(s.team2),
           };
@@ -358,9 +426,12 @@ export const useGameStore = create<GameState>()(
           activeTrap: null,
           activeFreeze: null,
           shieldUnlocked: false,
+          activeStreaks: { team1: null, team2: null },
+          lastCorrectAnswer: null,
+          pendingAnswer: null,
         }),
     }),
-    { name: STORE_KEY, version: 5 },
+    { name: STORE_KEY, version: 6 },
   ),
 );
 

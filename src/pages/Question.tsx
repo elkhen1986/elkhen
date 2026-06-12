@@ -24,6 +24,8 @@ export default function Question() {
   const activeTrap = useGameStore((s) => s.activeTrap);
   const activePit = useGameStore((s) => s.activePit);
   const shieldUnlocked = useGameStore((s) => s.shieldUnlocked);
+  const activeStreaks = useGameStore((s) => s.activeStreaks);
+  const activeStreak = currentTurn === 1? activeStreaks.team1 : activeStreaks.team2;
 
   const [revealed, setRevealed] = useState(false);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
@@ -143,76 +145,78 @@ export default function Question() {
   const opponentShield = currentTurn === 1? team2.shieldActive : team1.shieldActive;
 
   return (
-    <div className="min-h-screen p-3 sm:p-6 relative z-10 flex flex-col gap-4" dir="rtl">
+    <div className="h-[100dvh] p-2 sm:p-3 lg:p-4 relative z-10 flex flex-col gap-2 overflow-hidden" dir="rtl">
       <TopBar showBackToBoard />
-      <div className="flex flex-col lg:flex-row gap-5 flex-1 max-w-7xl mx-auto w-full">
-        <div className="flex-1 relative group">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 flex-1 min-h-0 max-w-7xl mx-auto w-full">
+        <div className="flex-1 relative group min-h-0">
           <div className="absolute -inset-1 bg-gradient-to-b from-primary/20 via-transparent to-amber-500/20 rounded-3xl blur-2xl opacity-70"></div>
-          <div className="relative h-full bg-gradient-to-b from-white/[0.09] to-white/[0.03] glass rounded-3xl border-white/15 overflow-hidden shadow-[0_25px_80px_-25px_rgba(0,0,0,0.8)]">
+          <div className="relative h-full bg-gradient-to-b from-white/[0.09] to-white/[0.03] glass rounded-2xl lg:rounded-3xl border-white/15 overflow-hidden shadow-[0_25px_80px_-25px_rgba(0,0,0,0.8)] flex flex-col">
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent"></div>
-            <div className="p-6 md:p-8 flex flex-col h-full">
-              <div className="flex items-center justify-between mb-6">
+            <div className="p-3 sm:p-4 lg:p-6 flex flex-col h-full min-h-0">
+              <div className="flex items-center justify-between mb-3 lg:mb-4 shrink-0">
                 <div className="relative">
                   <div className="absolute inset-0 bg-amber-500 blur-xl opacity-60 rounded-full"></div>
-                  <div className={`relative flex items-center gap-1.5 ${active.points===600 && knockoutWindow?'bg-gradient-to-b from-red-500 to-red-700 animate-pulse':'bg-gradient-to-b from-amber-300 to-amber-500'} text-black font-black px-4 py-2 rounded-xl text-lg shadow-xl border border-amber-200/50`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  <div className={`relative flex items-center ${active.points===600 && knockoutWindow?'bg-gradient-to-b from-red-500 to-red-700 animate-pulse':'bg-gradient-to-b from-amber-300 to-amber-500'} text-black font-black px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-sm sm:text-base lg:text-lg shadow-xl border-amber-200/50`}>
                     {active.points} نقطة
                   </div>
                 </div>
                 <QuestionTimer duration={timerDuration} />
-                <button onClick={() => { setRevealed(!revealed); questionVideoRef.current?.play().catch(()=>{}); answerVideoRef.current?.play().catch(()=>{}); }} className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-emerald-500/30 text-emerald-300 font-bold text-sm transition">
+                <button onClick={() => { setRevealed(!revealed); questionVideoRef.current?.play().catch(()=>{}); answerVideoRef.current?.play().catch(()=>{}); }} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 border border-emerald-500/30 text-emerald-300 font-bold text-xs sm:text-sm transition shrink-0">
                   {revealed? "إخفاء الإجابة" : "كشف الإجابة"}
                 </button>
               </div>
 
-              <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <div className="flex-1 flex flex-col items-center justify-center text-center min-h-0 overflow-hidden py-2">
                 {active.points===600 && knockoutWindow && (
-                  <div className="mb-3 text-red-400 font-black animate-pulse">⚡ الضربة القاضية - جاوب قبل 10 ثواني وخد 1200!</div>
+                  <div className="mb-2 text-red-400 font-black animate-pulse text-xs sm:text-sm lg:text-base">⚡ الضربة القاضية - جاوب قبل 10 ثواني وخد 1200!</div>
                 )}
                 {activeFreeze && (
-                  <div className="mb-3 text-sky-400 font-black animate-pulse">❄ تم تجميد الخصم ❄</div>
+                  <div className="mb-2 text-sky-400 font-black animate-pulse text-xs sm:text-sm lg:text-base">❄ تم تجميد الخصم ❄</div>
                 )}
-                <h2 className="text-xl md:text-2xl font-black leading-[1.6] text-white mb-6 max-w-3xl" dangerouslySetInnerHTML={{ __html: question.question }} />
+                {activeStreak && (
+                  <div className="mb-2 text-amber-400 font-black animate-pulse text-xs sm:text-sm lg:text-base">⚡ ستريك مفعل - {activeStreak.savedPoints > 0? `${activeStreak.savedPoints} نقطة مخزنة` : 'في انتظار الإجابة'}</div>
+                )}
+                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-black leading-[1.4] text-white mb-3 lg:mb-4 max-w-3xl px-2" dangerouslySetInnerHTML={{ __html: question.question }} />
                 {!revealed && (
-                  <>
+                  <div className="w-full flex-1 min-h-0 flex items-center justify-center">
                     {isDual? (
-                      <div className="flex gap-4 justify-center mb-4">
+                      <div className="flex gap-3 lg:gap-4 justify-center">
                         {[qImages[0], aImages[0]].map((src, idx) => src && (
                           <div key={idx} className="group/img relative">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
                             {isVideo(src)? (
-                              <video src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                              <video src={src} className={`relative w-auto max-h-[18vh] sm:max-h-[22vh] lg:max-h-[28vh] object-contain rounded-xl lg:rounded-2xl border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
                             ) : (
                               <button onClick={() => setZoomImg(src?? null)}>
-                                <img src={src} className={`relative w-auto max-h-48 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+                                <img src={src} className={`relative w-auto max-h-[18vh] sm:max-h-[22vh] lg:max-h-[28vh] object-contain rounded-xl lg:rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
                               </button>
                             )}
-                            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs font-black px-2 py-0.5 rounded-lg">{idx===0?'A':'B'}</div>
+                            <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 bg-black/70 text-white text-[10px] sm:text-xs font-black px-1.5 py-0.5 rounded-md sm:rounded-lg">{idx===0?'A':'B'}</div>
                           </div>
                         ))}
                       </div>
                     ) : (
                       <>
                         {qImages.length === 1 && (
-                          <div className="group/img relative mb-4 inline-block">
+                          <div className="group/img relative inline-block">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
                             {isVideo(qImages[0])? (
-                              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls />
+                              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-[20vh] sm:max-h-[25vh] lg:max-h-[32vh] xl:max-h-[35vh] object-contain rounded-xl lg:rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls />
                             ) : (
                               <button onClick={() => setZoomImg(qImages[0]?? null)}>
-                                <img src={qImages[0]} className={`relative w-auto max-h-56 object-contain rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+                                <img src={qImages[0]} className={`relative w-auto max-h-[20vh] sm:max-h-[25vh] lg:max-h-[32vh] xl:max-h-[35vh] object-contain rounded-xl lg:rounded-2xl border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
                               </button>
                             )}
                           </div>
                         )}
                         {qImages.length > 1 && (
-                          <div className="flex flex-wrap justify-center gap-4 mb-4 w-full max-w-4xl mx-auto">
+                          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 lg:gap-4 w-full max-w-4xl mx-auto">
                             {qImages.map((src, i) => {
                               const label = String.fromCharCode(65 + i);
                               return (
-                                <div key={i} className="group/img relative aspect-square w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
-                                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/0 to-emerald-500/0 group-hover/img:from-emerald-500/30 group-hover/img:to-green-500/30 rounded-2xl blur-xl transition duration-500"></div>
-                                  <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/15 group-hover/img:border-emerald-400 transition">
+                                <div key={i} className="group/img relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 xl:w-44 xl:h-44">
+                                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/0 to-emerald-500/0 group-hover/img:from-emerald-500/30 group-hover/img:to-green-500/30 rounded-xl lg:rounded-2xl blur-xl transition duration-500"></div>
+                                  <div className="relative w-full h-full rounded-xl lg:rounded-2xl overflow-hidden border border-white/15 group-hover/img:border-emerald-400 transition">
                                     {isVideo(src)? (
                                       <video src={src} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
                                     ) : (
@@ -221,7 +225,7 @@ export default function Question() {
                                       </button>
                                     )}
                                   </div>
-                                  <div className="absolute -top-3 -left-3 w-9 h-9 rounded-full bg-black/90 text-white flex items-center justify-center text-base font-black border-2 border-emerald-400 group-hover/img:border-green-400 group-hover/img:shadow-[0_0_12px_rgba(16,185,129,0.8)] transition">
+                                  <div className="absolute -top-2 -left-2 sm:-top-3 sm:-left-3 w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 rounded-full bg-black/90 text-white flex items-center justify-center text-xs sm:text-sm lg:text-base font-black border-2 border-emerald-400 group-hover/img:border-green-400 group-hover/img:shadow-[0_0_12px_rgba(16,185,129,0.8)] transition">
                                     {label}
                                   </div>
                                 </div>
@@ -231,42 +235,42 @@ export default function Question() {
                         )}
                       </>
                     )}
-                  </>
+                  </div>
                 )}
 
                 {revealed && (
-                  <div className="w-full max-w-2xl mt-4 animate-in fade-in slide-in-from-bottom-2 space-y-3">
-                    <div className="relative overflow-hidden bg-gradient-to-b from-emerald-950/80 to-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 backdrop-blur-xl">
+                  <div className="w-full max-w-2xl mt-2 lg:mt-3 animate-in fade-in slide-in-from-bottom-2 space-y-2 lg:space-y-3 overflow-y-auto max-h-[40vh]">
+                    <div className="relative overflow-hidden bg-gradient-to-b from-emerald-950/80 to-emerald-950/40 border border-emerald-500/30 rounded-xl lg:rounded-2xl p-3 lg:p-4 backdrop-blur-xl">
                       <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-400 to-transparent"></div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      <div className="flex items-start gap-2 lg:gap-3">
+                        <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-emerald-500/20 border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                         </div>
                         <div className="text-right flex-1">
-                          <div className="text-xs font-bold text-emerald-400 mb-1 tracking-wide">الإجابة الصحيحة</div>
-                          <div className="text-lg font-black text-white leading-snug" dangerouslySetInnerHTML={{ __html: question.answer }} />
+                          <div className="text-[10px] lg:text-xs font-bold text-emerald-400 mb-0.5 lg:mb-1 tracking-wide">الإجابة الصحيحة</div>
+                          <div className="text-base lg:text-lg font-black text-white leading-snug" dangerouslySetInnerHTML={{ __html: question.answer }} />
                         </div>
                       </div>
                     </div>
                     {(isDual? correctSrc : aImages.length>0) && (
                       <div className="w-full flex justify-center">
                         {aImages.length <= 1 &&!isDual? (
-                          <div className="inline-block rounded-2xl border border-emerald-500/30 p-0.5 bg-black/20">
+                          <div className="inline-block rounded-xl lg:rounded-2xl border border-emerald-500/30 p-0.5 bg-black/20">
                             {isVideo(aImages[0])? (
-                              <video ref={answerVideoRef} key={question.id + "-ans"} src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" autoPlay loop playsInline controls />
+                              <video ref={answerVideoRef} key={question.id + "-ans"} src={aImages[0]!} className="block max-h-[20vh] lg:max-h-[25vh] w-auto object-contain rounded-lg lg:rounded-xl" autoPlay loop playsInline controls />
                             ) : (
                               <button onClick={() => setZoomImg(aImages[0]?? null)}>
-                                <img src={aImages[0]!} className="block max-h-64 w-auto object-contain rounded-xl" alt="صورة الإجابة" />
+                                <img src={aImages[0]!} className="block max-h-[20vh] lg:max-h-[25vh] w-auto object-contain rounded-lg lg:rounded-xl" alt="صورة الإجابة" />
                               </button>
                             )}
                           </div>
                         ) : (
-                          <div className="flex flex-wrap justify-center gap-4 w-full">
+                          <div className="flex flex-wrap justify-center gap-2 lg:gap-4 w-full">
                             {(isDual? [correctSrc!] : aImages).map((src, i) => {
                               const label = String.fromCharCode(65 + i);
                               return (
-                                <div key={i} className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52">
-                                  <div className="w-full h-full rounded-2xl border border-emerald-500/40 overflow-hidden">
+                                <div key={i} className="relative w-24 h-24 sm:w-28 sm:h-28 lg:w-36 lg:h-36 xl:w-44 xl:h-44">
+                                  <div className="w-full h-full rounded-xl lg:rounded-2xl border border-emerald-500/40 overflow-hidden">
                                     {isVideo(src)? (
                                       <video src={src} className="w-full h-full object-fill" autoPlay loop playsInline controls />
                                     ) : (
@@ -276,7 +280,7 @@ export default function Question() {
                                     )}
                                   </div>
                                   {!isDual && aImages.length > 1 && (
-                                    <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-black/80 text-white flex items-center justify-center text-sm font-bold border border-emerald-400">{label}</div>
+                                    <div className="absolute -top-2 -left-2 w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-black/80 text-white flex items-center justify-center text-xs lg:text-sm font-bold border border-emerald-400">{label}</div>
                                   )}
                                 </div>
                               );
@@ -289,20 +293,20 @@ export default function Question() {
                 )}
               </div>
 
-              <div className="mt-8">
-                <div className="text-center text-white/60 font-bold mb-3">من جاوب على السؤال؟</div>
-                <div className="grid grid-cols-3 gap-3">
-                  <button disabled={isTeam1Frozen} onClick={() => handleWinner(1)} className="relative group h-16 rounded-2xl bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 border border-blue-400/30 shadow-[0_10px_30px_-10px_rgba(59,130,246,0.5)] transition-all hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
-                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 rounded-2xl transition" />
+              <div className="mt-3 lg:mt-4 shrink-0">
+                <div className="text-center text-white/60 font-bold mb-2 text-xs sm:text-sm lg:text-base">من جاوب على السؤال؟</div>
+                <div className="grid grid-cols-3 gap-2 lg:gap-3">
+                  <button disabled={isTeam1Frozen} onClick={() => handleWinner(1)} className="relative group h-11 sm:h-12 lg:h-14 xl:h-16 rounded-xl lg:rounded-2xl bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 border border-blue-400/30 shadow-[0_10px_30px_-10px_rgba(59,130,246,0.5)] transition-all hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 rounded-xl lg:rounded-2xl transition" />
                     <div className="relative flex items-center justify-center h-full px-2">
-                      <span className="text-xl font-black text-white truncate">{team1.name || "فريق 1"}{isTeam1Frozen && ' ❄'}</span>
+                      <span className="text-sm sm:text-base lg:text-lg xl:text-xl font-black text-white truncate">{team1.name || "فريق 1"}{isTeam1Frozen && ' ❄'}</span>
                     </div>
                   </button>
-                  <button onClick={() => handleWinner(0)} className="h-16 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 font-bold transition">لا أحد</button>
-                  <button disabled={isTeam2Frozen} onClick={() => handleWinner(2)} className="relative group h-16 rounded-2xl bg-gradient-to-b from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 border border-pink-400/30 shadow-[0_10px_30px_-10px_rgba(236,72,153,0.5)] transition-all hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
-                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 rounded-2xl transition" />
+                  <button onClick={() => handleWinner(0)} className="h-11 sm:h-12 lg:h-14 xl:h-16 rounded-xl lg:rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 font-bold transition text-xs sm:text-sm lg:text-base">لا أحد</button>
+                  <button disabled={isTeam2Frozen} onClick={() => handleWinner(2)} className="relative group h-11 sm:h-12 lg:h-14 xl:h-16 rounded-xl lg:rounded-2xl bg-gradient-to-b from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 border border-pink-400/30 shadow-[0_10px_30px_-10px_rgba(236,72,153,0.5)] transition-all hover:scale-[1.02] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100">
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 rounded-xl lg:rounded-2xl transition" />
                     <div className="relative flex items-center justify-center h-full px-2">
-                      <span className="text-xl font-black text-white truncate">{team2.name || "فريق 2"}{isTeam2Frozen && ' ❄'}</span>
+                      <span className="text-sm sm:text-base lg:text-lg xl:text-xl font-black text-white truncate">{team2.name || "فريق 2"}{isTeam2Frozen && ' ❄'}</span>
                     </div>
                   </button>
                 </div>
@@ -311,41 +315,57 @@ export default function Question() {
           </div>
         </div>
 
-        <aside className="lg:w-72 flex flex-col gap-3">
-          <div className="bg-white/[0.05] glass rounded-2xl p-4 border-white/10">
-            <h4 className="font-bold mb-3 text-center text-sm text-white/60">وسائل المساعدة</h4>
-            <div className="grid grid-cols-3 gap-2">
+<aside className="lg:w-[19rem] xl:w-[21rem] flex flex-col gap-2 lg:gap-3 shrink-0">
+          <div className="bg-white/[0.05] glass rounded-xl lg:rounded-2xl p-3 lg:p-4 border-white/10">
+            <h4 className="font-bold mb-2 lg:mb-3 text-center text-xs lg:text-sm text-white/60">وسائل المساعدة</h4>
+            <div className="grid grid-cols-3 gap-1.5 lg:gap-2">
               {(() => {
                 const currentTeam = currentTurn === 1? team1 : team2;
-                const aids = (currentTeam.selectedAids || []) as import("@/store/gameStore").AidType[];
-                const icons: Record<string, string> = { swap: '🔄', pit: '🕳', twoAnswers: '✌', trap: '🪤', freeze: '❄', shield: '🛡' };
-                const labels: Record<string, string> = { swap: 'تبديل', pit: 'حفرة', twoAnswers: 'إجابتين', trap: 'فخ', freeze: 'تجميد', shield: 'درع' };
+                const aids = [...(currentTeam.selectedAids || [])] as import("@/store/gameStore").AidType[];
+                if (currentTeam.aids.streak) {
+                  aids.push('streak');
+                }
+                const icons: Record<string, string> = { swap: '🔄', pit: '🕳', twoAnswers: '✌', trap: '🪤', freeze: '❄', shield: '🛡', streak: '⚡' };
+                const labels: Record<string, string> = { swap: 'تبديل', pit: 'حفرة', twoAnswers: 'إجابتين', trap: 'فخ', freeze: 'تجميد', shield: 'درع', streak: 'ستريك' };
                 return aids.map((aid) => {
-                  const isDisabled =!currentTeam.aids[aid]
-                    || aid==='pit'
-                    || aid==='shield'
-                    || ((aid==='trap' || aid==='freeze') && opponentShield)
-                    || currentTeam.usedAidThisTurn
-                    || (aid==='trap' && activeFreeze?.owner === currentTurn)
-                    || (aid==='freeze' && activeTrap?.owner === currentTurn);
+                  const isStreak = aid === 'streak';
+                  const isDisabled = isStreak
+                 ? (!currentTeam.aids.streak ||!!activeStreak)
+                    :!currentTeam.aids[aid]
+                      || aid==='pit'
+                      || aid==='shield'
+                      || ((aid==='trap' || aid==='freeze') && opponentShield)
+                      || currentTeam.usedAidThisTurn
+                      || (aid==='trap' && activeFreeze?.owner === currentTurn)
+                      || (aid==='freeze' && activeTrap?.owner === currentTurn);
+                  const isActive = isStreak &&!!activeStreak;
                   return (
                     <button
                       key={aid}
                       disabled={isDisabled}
                       onClick={() => { useAid(currentTurn, aid); if (aid === 'swap') swapActiveQuestion(); }}
-                      className="flex-col h-auto py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl disabled:opacity-40"
+                      className={`flex flex-col items-center justify-center h-auto py-2 lg:py-2.5 border rounded-lg lg:rounded-xl transition ${
+                        isActive
+                       ? 'bg-amber-500/30 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      } disabled:opacity-40`}
                     >
-                      <span className="text-xl">{icons[aid]}</span>
-                      <span className="text-[10px] mt-1 block">{labels[aid]}</span>
+                      <span className={`text-base lg:text-xl ${isActive? 'text-amber-300' : ''}`}>{icons[aid]}</span>
+                      <span className={`text-[9px] lg:text-[10px] mt-0.5 lg:mt-1 block ${isActive? 'text-amber-300 font-bold' : ''}`}>{labels[aid]}</span>
                     </button>
                   );
                 });
               })()}
             </div>
-            {opponentShield && <div className="text-xs text-violet-400 text-center mt-2">الخصم مفعل درع 🛡</div>}
+            {opponentShield && <div className="text-[10px] lg:text-xs text-violet-400 text-center mt-1.5 lg:mt-2">الخصم مفعل درع 🛡</div>}
+            {activeStreak && <div className="text-[10px] lg:text-xs text-amber-400 text-center mt-1.5 lg:mt-2 font-bold">⚡ ستريك نشط</div>}
           </div>
-          <TeamScoreBar team={1} />
-          <TeamScoreBar team={2} />
+          <div className="shrink-0">
+            <TeamScoreBar team={1} />
+          </div>
+          <div className="mt-2 lg:mt-3 shrink-0">
+            <TeamScoreBar team={2} />
+          </div>
         </aside>
       </div>
 
@@ -370,7 +390,7 @@ export default function Question() {
               <h3 className="text-2xl font-black text-white mb-2">الضربة القاضية</h3>
               <p className="text-white/70 mb-6">صاحب الدور <span className="text-primary font-bold">{pendingWinner===1?team1.name:team2.name}</span> جاوب صح في أول 10 ثواني؟</p>
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={()=>confirmKnockout(true)} className="h-14 rounded-2xl bg-gradient-primary text-black font-black text-lg hover:opacity-90 transition shadow-[0_10px_30px_-10px_rgba(16,185,129,0.5)]">نعم - 1200</button>
+                <button onClick={()=>confirmKnockout(true)} className="h-14 rounded-2xl bg-gradient-to-b from-emerald-400 to-emerald-600 text-black font-black text-lg hover:opacity-90 transition shadow-[0_10px_30px_-10px_rgba(16,185,129,0.5)]">نعم - 1200</button>
                 <button onClick={()=>confirmKnockout(false)} className="h-14 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/20 text-white font-bold text-lg transition">لا - 600</button>
               </div>
             </div>
