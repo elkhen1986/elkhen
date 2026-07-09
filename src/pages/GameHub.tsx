@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
-import { Trophy, Gavel, Zap, Crown, LogOut, Camera, Shield, Maximize, Minimize } from 'lucide-react'
+import { Trophy, Gavel, Zap, Crown, LogOut, Camera, Shield, Maximize, Minimize, Brain } from 'lucide-react'
 import { signOut, updateProfile } from 'firebase/auth'
 import { auth, db, storage } from '@/lib/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
@@ -15,7 +15,7 @@ const modes = [
     id: 'classic',
     title: 'مسابقة خُن',
     tag: 'خُنها',
-    desc: 'لو عرفتها.. خُنها.',
+    desc: 'لو عرفتها .. خُنها.',
     icon: Trophy,
     color: 'from-violet-600 to-indigo-700',
     glow: 'rgba(124,58,237,0.5)',
@@ -35,14 +35,25 @@ const modes = [
   },
   {
     id: 'speed',
-    title: 'أسئلة سرعة',
+    title: 'خُن بسرعة ',
     tag: 'البرق',
-    desc: 'خُن قبل ما الوقت يخونك.',
+    desc: 'خُن .. قبل ما الوقت يخونك.',
     icon: Zap,
     color: 'from-cyan-500 to-blue-600',
     glow: 'rgba(6,182,212,0.5)',
     path: '/speed',
-    active: false,
+    active: true,
+  },
+  {
+    id: 'wordle',
+    title: 'خُن الكلمة',
+    tag: 'لمّحها',
+    desc: 'خمنها صح ..',
+    icon: Brain,
+    color: 'from-emerald-500 to-teal-600',
+    glow: 'rgba(16,185,129,0.5)',
+    path: '/wordle',
+    active: true,
   },
 ]
 
@@ -163,7 +174,7 @@ export default function GameHub() {
         </Button>
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8 py-10">
         <div className="text-center mb-6 animate-fade-in">
           <div className="inline-flex items-center gap-3 glass rounded-full px-7 py-2 mb-4">
             <span className="text-red-600 font-black text-xl">خلِّكـ</span>
@@ -174,7 +185,7 @@ export default function GameHub() {
           <p className="text-muted-foreground mt-2">اختار اللعبة وابدأ التحدي</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
           {modes.map((m) => {
             const Icon = m.icon
             return (
@@ -232,9 +243,9 @@ export default function GameHub() {
                 );
               }
               const end = subInfo?.subscriptionEnd?.toDate
-               ? subInfo.subscriptionEnd.toDate()
+             ? subInfo.subscriptionEnd.toDate()
                 : subInfo?.subscriptionEnd?.seconds
-               ? new Date(subInfo.subscriptionEnd.seconds * 1000)
+             ? new Date(subInfo.subscriptionEnd.seconds * 1000)
                 : null;
               const remaining = end? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000)) : 0;
               const isActive = subInfo?.isActive && remaining > 0;

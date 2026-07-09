@@ -33,6 +33,7 @@ export default function Question() {
   const [question, setQuestion] = useState<QType | null>(null);
   const [showKnockout, setShowKnockout] = useState(false);
   const [pendingWinner, setPendingWinner] = useState<1|2>(1);
+  const [mediaReady, setMediaReady] = useState(false); // ← جديد
 
   const questionVideoRef = useRef<HTMLVideoElement>(null);
   const answerVideoRef = useRef<HTMLVideoElement>(null);
@@ -67,6 +68,12 @@ export default function Question() {
 
   const qImages = useMemo(() => question?.image?? [], [question]);
   const aImages = useMemo(() => question?.answerImage?? [], [question]);
+
+  // ← جديد: ريست حالة الميديا مع كل سؤال
+  useEffect(() => {
+    const hasMedia = qImages && qImages.length > 0;
+    setMediaReady(!hasMedia);
+  }, [question?.id, qImages]);
 
   useEffect(() => {
     if (active?.points === 600) {
@@ -132,11 +139,12 @@ export default function Question() {
 
   const confirmKnockout = (isYes: boolean) => {
     setShowKnockout(false);
+    finalAudio.current?.pause();
+    delete document.body.dataset.final;
     if (isYes) {
-      adjustScore(pendingWinner, 600);
       new Audio('/sounds/knockout.mp3').play().catch(()=>{});
     }
-    awardPoints(pendingWinner);
+    awardPoints(pendingWinner, isYes? 600 : 0);
     navigate("/board");
   };
 
@@ -160,7 +168,7 @@ export default function Question() {
                     {active.points} نقطة
                   </div>
                 </div>
-                <QuestionTimer duration={timerDuration} />
+                <QuestionTimer duration={timerDuration} isReady={mediaReady} />
                 <button onClick={() => { setRevealed(!revealed); questionVideoRef.current?.play().catch(()=>{}); answerVideoRef.current?.play().catch(()=>{}); }} className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 border border-emerald-500/30 text-emerald-300 font-bold text-xs sm:text-sm transition shrink-0">
                   {revealed? "إخفاء الإجابة" : "كشف الإجابة"}
                 </button>
@@ -185,10 +193,10 @@ export default function Question() {
                           <div key={idx} className="group/img relative">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
                             {isVideo(src)? (
-                              <video src={src} className={`relative w-auto max-h-[18vh] sm:max-h-[22vh] lg:max-h-[28vh] object-contain rounded-xl lg:rounded-2xl border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                              <video src={src} className={`relative w-auto max-h-[18vh] sm:max-h-[22vh] lg:max-h-[28vh] object-contain rounded-xl lg:rounded-2xl border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted onCanPlayThrough={() => setMediaReady(true)} onLoadedData={() => setMediaReady(true)} />
                             ) : (
                               <button onClick={() => setZoomImg(src?? null)}>
-                                <img src={src} className={`relative w-auto max-h-[18vh] sm:max-h-[22vh] lg:max-h-[28vh] object-contain rounded-xl lg:rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+                                <img src={src} className={`relative w-auto max-h-[18vh] sm:max-h-[22vh] lg:max-h-[28vh] object-contain rounded-xl lg:rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} onLoad={() => setMediaReady(true)} onError={() => setMediaReady(true)} />
                               </button>
                             )}
                             <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 bg-black/70 text-white text-[10px] sm:text-xs font-black px-1.5 py-0.5 rounded-md sm:rounded-lg">{idx===0?'A':'B'}</div>
@@ -201,10 +209,10 @@ export default function Question() {
                           <div className="group/img relative inline-block">
                             <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-amber-500/30 rounded-2xl blur-2xl opacity-0 group-hover/img:opacity-70 transition duration-700"></div>
                             {isVideo(qImages[0])? (
-                              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-[20vh] sm:max-h-[25vh] lg:max-h-[32vh] xl:max-h-[35vh] object-contain rounded-xl lg:rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls />
+                              <video ref={questionVideoRef} key={question.id} src={qImages[0]} className={`relative w-auto max-h-[20vh] sm:max-h-[25vh] lg:max-h-[32vh] xl:max-h-[35vh] object-contain rounded-xl lg:rounded-2xl border border-white/15 ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline controls onCanPlayThrough={() => setMediaReady(true)} onLoadedData={() => setMediaReady(true)} />
                             ) : (
                               <button onClick={() => setZoomImg(qImages[0]?? null)}>
-                                <img src={qImages[0]} className={`relative w-auto max-h-[20vh] sm:max-h-[25vh] lg:max-h-[32vh] xl:max-h-[35vh] object-contain rounded-xl lg:rounded-2xl border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} />
+                                <img src={qImages[0]} className={`relative w-auto max-h-[20vh] sm:max-h-[25vh] lg:max-h-[32vh] xl:max-h-[35vh] object-contain rounded-xl lg:rounded-2xl border-white/15 ${isColorQuestion? 'grayscale contrast-125' : ''}`} onLoad={() => setMediaReady(true)} onError={() => setMediaReady(true)} />
                               </button>
                             )}
                           </div>
@@ -218,10 +226,10 @@ export default function Question() {
                                   <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/0 to-emerald-500/0 group-hover/img:from-emerald-500/30 group-hover/img:to-green-500/30 rounded-xl lg:rounded-2xl blur-xl transition duration-500"></div>
                                   <div className="relative w-full h-full rounded-xl lg:rounded-2xl overflow-hidden border border-white/15 group-hover/img:border-emerald-400 transition">
                                     {isVideo(src)? (
-                                      <video src={src} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted />
+                                      <video src={src} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} autoPlay loop playsInline muted onCanPlayThrough={() => setMediaReady(true)} onLoadedData={() => setMediaReady(true)} />
                                     ) : (
                                       <button onClick={() => setZoomImg(src)} className="w-full h-full block">
-                                        <img src={src} alt={`img-${label}`} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} />
+                                        <img src={src} alt={`img-${label}`} className={`w-full h-full object-fill ${isColorQuestion? 'grayscale' : ''}`} onLoad={() => setMediaReady(true)} onError={() => setMediaReady(true)} />
                                       </button>
                                     )}
                                   </div>
@@ -315,7 +323,7 @@ export default function Question() {
           </div>
         </div>
 
-<aside className="lg:w-[19rem] xl:w-[21rem] flex flex-col gap-2 lg:gap-3 shrink-0">
+        <aside className="lg:w-[19rem] xl:w-[21rem] flex flex-col gap-2 lg:gap-3 shrink-0">
           <div className="bg-white/[0.05] glass rounded-xl lg:rounded-2xl p-3 lg:p-4 border-white/10">
             <h4 className="font-bold mb-2 lg:mb-3 text-center text-xs lg:text-sm text-white/60">وسائل المساعدة</h4>
             <div className="grid grid-cols-3 gap-1.5 lg:gap-2">
@@ -330,7 +338,7 @@ export default function Question() {
                 return aids.map((aid) => {
                   const isStreak = aid === 'streak';
                   const isDisabled = isStreak
-                 ? (!currentTeam.aids.streak ||!!activeStreak)
+                  ? (!currentTeam.aids.streak ||!!activeStreak)
                     :!currentTeam.aids[aid]
                       || aid==='pit'
                       || aid==='shield'
@@ -346,7 +354,7 @@ export default function Question() {
                       onClick={() => { useAid(currentTurn, aid); if (aid === 'swap') swapActiveQuestion(); }}
                       className={`flex flex-col items-center justify-center h-auto py-2 lg:py-2.5 border rounded-lg lg:rounded-xl transition ${
                         isActive
-                       ? 'bg-amber-500/30 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse'
+                        ? 'bg-amber-500/30 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.6)] animate-pulse'
                           : 'bg-white/5 border-white/10 hover:bg-white/10'
                       } disabled:opacity-40`}
                     >

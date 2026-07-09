@@ -5,11 +5,12 @@ import { cn } from "@/lib/utils";
 interface Props {
   duration: number; // seconds
   onTimeUp?: () => void;
+  isReady?: boolean; // ← جديد
 }
 
-export function QuestionTimer({ duration, onTimeUp }: Props) {
+export function QuestionTimer({ duration, onTimeUp, isReady = true }: Props) {
   const [remaining, setRemaining] = useState(duration);
-  const [running, setRunning] = useState(true);
+  const [running, setRunning] = useState(false); // ← بقى false
   const ref = useRef<number | null>(null);
   const firedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -20,11 +21,22 @@ export function QuestionTimer({ duration, onTimeUp }: Props) {
     audioRef.current.volume = 0.5;
   }, []);
 
+  // ← جديد: شغّل لما الصورة تجهز
   useEffect(() => {
-    if (!running) return;
+    if (isReady) {
+      firedRef.current = false;
+      setRemaining(duration);
+      setRunning(true);
+    } else {
+      setRunning(false);
+    }
+  }, [isReady, duration]);
+
+  useEffect(() => {
+    if (!running || !isReady) return;
     ref.current = window.setInterval(() => {
       setRemaining((r) => {
-        const next = r <= 1? 0 : r - 1;
+        const next = r <= 1 ? 0 : r - 1;
 
         // شغل صوت tick آخر 5 ثواني
         if (next <= 5 && next > 0 && audioRef.current) {
@@ -39,16 +51,16 @@ export function QuestionTimer({ duration, onTimeUp }: Props) {
       });
     }, 1000);
     return () => { if (ref.current) window.clearInterval(ref.current); };
-  }, [running, onTimeUp]);
+  }, [running, onTimeUp, isReady]);
 
   // اسمع إيفنت إعادة التايمر من الوسائل
   useEffect(() => {
-    const resetTimer = () => { firedRef.current = false; setRemaining(duration); setRunning(true); };
+    const resetTimer = () => { firedRef.current = false; setRemaining(duration); setRunning(isReady); };
     window.addEventListener('aid-used-reset-timer', resetTimer);
     return () => window.removeEventListener('aid-used-reset-timer', resetTimer);
-  }, [duration]);
+  }, [duration, isReady]);
 
-  const reset = () => { firedRef.current = false; setRemaining(duration); setRunning(true); };
+  const reset = () => { firedRef.current = false; setRemaining(duration); setRunning(isReady); };
   const minutes = Math.floor(remaining / 60).toString().padStart(2, "0");
   const seconds = (remaining % 60).toString().padStart(2, "0");
   const danger = remaining <= 10 && remaining > 0;
@@ -58,12 +70,12 @@ export function QuestionTimer({ duration, onTimeUp }: Props) {
       "glass-strong rounded-full px-4 py-2 flex items-center gap-3",
       danger && "ring-2 ring-destructive animate-pulse",
     )}>
-      <button onClick={() => setRunning((r) =>!r)} className="text-foreground hover:text-primary transition">
-        {running? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+      <button onClick={() => setRunning((r) => !r)} className="text-foreground hover:text-primary transition">
+        {running ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
       </button>
       <span className={cn(
         "text-xl sm:text-2xl font-black tabular-nums",
-        danger? "text-destructive" : "text-foreground"
+        danger ? "text-destructive" : "text-foreground"
       )}>
         {minutes}:{seconds}
       </span>

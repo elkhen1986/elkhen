@@ -18,6 +18,9 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Victory from "@/pages/Victory";
 import GameHub from "./pages/GameHub";
+import Wordle from "./pages/Wordle";
+import SpeedSetup from '@/pages/SpeedSetup'
+import SpeedPlay from '@/pages/SpeedPlay'
 
 const queryClient = new QueryClient();
 
@@ -107,6 +110,10 @@ const App = () => {
             <Route path="/question" element={<PrivateRoute><Question /></PrivateRoute>} />
             <Route path="/victory" element={<PrivateRoute><Victory /></PrivateRoute>} />
             <Route path="*" element={<NotFound />} />
+            <Route path="/wordle" element={<PrivateRoute><Wordle /></PrivateRoute>} />
+            <Route path="/speed" element={<SpeedSetup />} />
+            <Route path="/speed/play" element={<SpeedPlay />} />
+
 
           </Routes>
         </BrowserRouter>
